@@ -60,6 +60,7 @@ export default function Navbar() {
   const [openMobileDropdown, setOpenMobileDropdown] = useState<MobileDropdownKey>(null);
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [signingIn, setSigningIn] = useState(false); // ← added
   const router = useRouter();
   const prefetch = useSmartPrefetch();
 
@@ -68,6 +69,7 @@ export default function Navbar() {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setAuthReady(true);
+      if (u) setSigningIn(false); // ensure buttons re-enable after successful redirect
     });
     completeAuthRedirect().catch(() => {});
     return () => unsub();
@@ -100,16 +102,20 @@ export default function Navbar() {
   // Desktop popup / Mobile redirect are split to be explicit
   const handleDesktopSignIn = async () => {
     try {
+      setSigningIn(true); // ← added
       await signInWithGoogle({ forceRedirect: false });
     } catch (err) {
       console.error('Sign in error:', err);
+      setSigningIn(false); // ← added
     }
   };
   const handleMobileSignIn = async () => {
     try {
+      setSigningIn(true); // ← added
       await signInWithGoogle({ forceRedirect: true });
     } catch (err) {
       console.error('Sign in error:', err);
+      setSigningIn(false); // ← added
     }
   };
 
@@ -258,12 +264,21 @@ export default function Navbar() {
               authReady && (
                 <>
                   {/* Desktop popup */}
-                  <Button onClick={handleDesktopSignIn} className="hidden sm:inline-flex bg-sky-600 hover:bg-sky-700">
-                    Sign Up
+                  <Button
+                    onClick={handleDesktopSignIn}
+                    disabled={signingIn} // ← added
+                    className="hidden sm:inline-flex bg-sky-600 hover:bg-sky-700"
+                  >
+                    {signingIn ? 'Signing in…' : 'Sign Up'}
                   </Button>
                   {/* Mobile forced redirect */}
-                  <Button onClick={handleMobileSignIn} className="sm:hidden bg-sky-600 hover:bg-sky-700" size="sm">
-                    Sign Up
+                  <Button
+                    onClick={handleMobileSignIn}
+                    disabled={signingIn} // ← added
+                    className="sm:hidden bg-sky-600 hover:bg-sky-700"
+                    size="sm"
+                  >
+                    {signingIn ? 'Signing in…' : 'Sign Up'}
                   </Button>
                 </>
               )
