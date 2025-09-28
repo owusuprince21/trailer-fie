@@ -1,225 +1,369 @@
-// app/search/page.tsx
+'use client';
+
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { cn } from '@/lib/utils';
-// If you already have helpers like getImageUrl, import them:
-// import { getImageUrl } from '@/lib/tmdb';
+import { useRouter } from 'next/navigation'; // ⬅️ removed useSearchParams
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { getImageUrl } from '@/lib/tmdb';
+import { useSearchMulti } from '@/lib/swr';
+import { Search as SearchIcon } from 'lucide-react';
+import type { MultiResult, SearchMultiResponse } from '@/lib/swr';
 
-export const revalidate = 0;            // no cache; or remove if you want SSG
-export const dynamic = 'force-dynamic'; // optional: ensures fully dynamic
+/* --------- Suspense-free replacement for useSearchParams --------- */
+function useUrlSearchParams(): URLSearchParams {
+  const [sp, setSp] = useState<URLSearchParams>(() => new URLSearchParams());
 
-type SearchPageProps = {
-  searchParams: { q?: string; page?: string };
-};
+useEffect(() => {
+  const read = () => setSp(new URLSearchParams(window.location.search));
 
-type BaseItem = {
-  id: number;
-  media_type: 'movie' | 'tvs';
-  title: string;
-  year?: string;
-  poster_path?: string | null;
-};
+  const emit = () => window.dispatchEvent(new Event('locationchange'));
 
-type SearchResponse = {
-  page: number;
-  total_pages: number;
-  total_results: number;
-  results: BaseItem[];
-};
+  const origPush = history.pushState;
+  const origReplace = history.replaceState;
 
-function safeInt(v: unknown, fallback: number) {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
-}
+  // Patch with proper `this` typing and signatures
+  history.pushState = function pushStatePatched(
+    this: History,
+    data: any,
+    unused: string,
+    url?: string | URL | null
+  ) {
+    const ret = origPush.call(this, data, unused, url);
+    emit();
+    return ret;
+  } as History['pushState'];
 
-function buildHref(q: string, page: number) {
-  const usp = new URLSearchParams();
-  if (q) usp.set('q', q);
-  usp.set('page', String(page));
-  return `/search?${usp.toString()}`;
-}
+  history.replaceState = function replaceStatePatched(
+    this: History,
+    data: any,
+    unused: string,
+    url?: string | URL | null
+  ) {
+    const ret = origReplace.call(this, data, unused, url);
+    emit();
+    return ret;
+  } as History['replaceState'];
 
-/**
- * Replace this with your real data source.
- * If you already have /api/search, this will work out of the box.
- */
-async function fetchSearch(q: string, page: number): Promise<SearchResponse> {
-  if (!q) {
-    return { page: 1, total_pages: 1, total_results: 0, results: [] };
-  }
+  // initial + listeners
+  read();
+  window.addEventListener('popstate', read);
+  window.addEventListener('locationchange', read);
 
-  // Try your internal API route first (recommended)
-  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? ''}/api/search?q=${encodeURIComponent(q)}&page=${page}`, {
-    // If your API is same-origin in App Router, omit the base URL:
-    // fetch(`/api/search?q=${encodeURIComponent(q)}&page=${page}`, { ... })
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    // Return an empty shape on failure so the page still renders
-    return { page, total_pages: 1, total_results: 0, results: [] };
-  }
-
-  const json = await res.json();
-
-  // 🔧 Map your API shape into BaseItem[] if needed.
-  // Below is a lenient mapper; adjust fields to your API.
-  const results: BaseItem[] = (json.results ?? []).map((r: any) => ({
-    id: Number(r.id),
-    media_type: r.media_type === 'tvs' ? 'tvs' : 'movie',
-    title: r.title ?? r.name ?? 'Untitled',
-    year: (r.release_date ?? r.first_air_date ?? '').slice(0, 4),
-    poster_path: r.poster_path ?? null,
-  }));
-
-  return {
-    page: Number(json.page ?? page),
-    total_pages: Number(json.total_pages ?? 1),
-    total_results: Number(json.total_results ?? results.length),
-    results,
+  return () => {
+    window.removeEventListener('popstate', read);
+    window.removeEventListener('locationchange', read);
+    history.pushState = origPush;
+    history.replaceState = origReplace;
   };
+}, []);
+
+
+  return sp;
+}
+/* ---------------------------------------------------------------- */
+
+/* -------------------- tiny skeleton atoms -------------------- */
+function Skel({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-white/10 ${className}`} />;
+}
+function SkelLine({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse h-4 rounded bg-white/10 ${className}`} />;
+}
+function SidebarSkeleton() {
+  return (
+    <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5">
+      <div className="px-4 py-3 bg-white/10">
+        <SkelLine className="w-32 h-4" />
+      </div>
+      <div className="p-2 space-y-1.5">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-between w-full rounded-md px-3 py-2"
+          >
+            <SkelLine className="w-28 h-3.5" />
+            <Skel className="w-8 h-6 rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function ResultCardSkeleton() {
+  return (
+    <article className="rounded-xl border border-white/10 bg-white/5 shadow">
+      <div className="flex gap-4 p-3 sm:p-4">
+        <div className="relative w-[85px] h-[125px] shrink-0 overflow-hidden rounded">
+          <Skel className="absolute inset-0" />
+        </div>
+        <div className="flex-1 min-w-0 py-1">
+          <SkelLine className="w-3/4 mb-2 h-4" />
+          <SkelLine className="w-1/3 mb-3 h-3.5" />
+          <SkelLine className="w-full mb-2" />
+          <SkelLine className="w-5/6" />
+        </div>
+      </div>
+    </article>
+  );
+}
+/* ------------------------------------------------------------- */
+
+function formatDateSafe(iso?: string) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  if (!Number.isFinite(y)) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export default async function Page({ searchParams }: SearchPageProps) {
-  const q = String(searchParams.q ?? '').trim();
-  const page = safeInt(searchParams.page, 1);
+export default function SearchPage() {
+  const router = useRouter();
+  const sp = useUrlSearchParams(); // ⬅️ replaced useSearchParams()
+  const qParam = (sp.get('q') || '').trim();
+  const typeParam = (sp.get('type') || '').trim().toLowerCase() as 'movie' | 'tv' | 'person' | '';
 
-  const data = await fetchSearch(q, page);
+  const [inputValue, setInputValue] = useState(qParam);
+  useEffect(() => setInputValue(qParam), [qParam]);
+
+  // typed usage of the multi-search hook
+  const { data, isLoading } = useSearchMulti(qParam) as unknown as {
+    data?: SearchMultiResponse;
+    isLoading: boolean;
+  };
+
+  const all: MultiResult[] = data?.results ?? [];
+  const movies = all.filter((r) => r.media_type === 'movie');
+  const tv = all.filter((r) => r.media_type === 'tv');
+  const people = all.filter((r) => r.media_type === 'person');
+
+  const moviesCount = movies.length;
+  const tvCount = tv.length;
+  const peopleCount = people.length;
+
+  const activeType: 'movie' | 'tv' | 'person' = useMemo(() => {
+    if (typeParam === 'movie' || typeParam === 'tv' || typeParam === 'person') return typeParam;
+    if (moviesCount > 0) return 'movie';
+    if (tvCount > 0) return 'tv';
+    if (peopleCount > 0) return 'person';
+    return 'movie';
+  }, [typeParam, moviesCount, tvCount, peopleCount]);
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const next = inputValue.trim();
+    if (!next) return;
+    router.push(`/search?q=${encodeURIComponent(next)}&type=${activeType}`);
+  };
+
+  const goType = (t: 'movie' | 'tv' | 'person') => {
+    const nextQ = qParam || inputValue || '';
+    router.push(`/search?q=${encodeURIComponent(nextQ)}&type=${t}`);
+  };
+
+  const showSkeleton = qParam && isLoading;
 
   return (
-    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <header className="mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Search</h1>
-          <p className="text-sm text-white/70">
-            {q ? (
-              <>
-                Showing results for <span className="text-white">{q}</span>
-                {data.total_results ? (
-                  <> — {data.total_results.toLocaleString()} found</>
-                ) : null}
-              </>
+    <div className="min-h-screen">
+      <Navbar />
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[65px]">
+        <form onSubmit={onSubmit} className="flex items-center gap-3">
+          <div className="relative w-full">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Search movies, TV, people…"
+              className="pl-9"
+            />
+          </div>
+          <Button type="submit">Search</Button>
+        </form>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar */}
+          <aside className="lg:col-span-1">
+            {showSkeleton ? (
+              <SidebarSkeleton />
             ) : (
-              <>Type a query to begin.</>
+              <div className="rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                <div className="px-4 py-3 font-semibold text-white bg-white/10">
+                  Search Results
+                </div>
+                <nav className="p-2">
+                  <SidebarItem
+                    label="TV Shows"
+                    count={tvCount}
+                    active={activeType === 'tv'}
+                    onClick={() => goType('tv')}
+                  />
+                  <SidebarItem
+                    label="Movies"
+                    count={moviesCount}
+                    active={activeType === 'movie'}
+                    onClick={() => goType('movie')}
+                  />
+                  <SidebarItem
+                    label="People"
+                    count={peopleCount}
+                    active={activeType === 'person'}
+                    onClick={() => goType('person')}
+                  />
+                  {/* Optional placeholders */}
+                  <SidebarItem label="Collections" count={0} disabled />
+                  <SidebarItem label="Companies" count={0} disabled />
+                  <SidebarItem label="Keywords" count={0} disabled />
+                  <SidebarItem label="Networks" count={0} disabled />
+                  <SidebarItem label="Awards" count={0} disabled />
+                </nav>
+              </div>
             )}
-          </p>
-        </div>
+          </aside>
 
-        {/* Simple pagination (Prev / Next) */}
-        {q && data.total_pages > 1 ? (
-          <nav className="flex items-center gap-2">
-            <Link
-              href={buildHref(q, Math.max(1, page - 1))}
-              className={cn(
-                'px-3 py-1.5 rounded border border-white/15 text-sm',
-                page <= 1
-                  ? 'pointer-events-none opacity-40'
-                  : 'hover:bg-white/10'
-              )}
-              aria-disabled={page <= 1}
-            >
-              Prev
-            </Link>
-            <span className="text-sm text-white/70">
-              Page <span className="text-white">{page}</span> of{' '}
-              <span className="text-white">{data.total_pages}</span>
-            </span>
-            <Link
-              href={buildHref(q, Math.min(data.total_pages, page + 1))}
-              className={cn(
-                'px-3 py-1.5 rounded border border-white/15 text-sm hover:bg-white/10',
-                page >= data.total_pages
-                  ? 'pointer-events-none opacity-40'
-                  : 'hover:bg-white/10'
-              )}
-              aria-disabled={page >= data.total_pages}
-            >
-              Next
-            </Link>
-          </nav>
-        ) : null}
-      </header>
+          {/* Results */}
+          <main className="lg:col-span-3">
+            {!qParam && <div className="text-gray-300">Start by searching for a title above.</div>}
 
-      {/* Empty state */}
-      {!q ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-white/70">
-          Try searching for a movie or series.
-        </div>
-      ) : data.results.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-white/80">
-          No results for “{q}”.
-        </div>
-      ) : (
-        <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {data.results.map((it) => {
-            const href = it.media_type === 'movie' ? `/movie/${it.id}` : `/tvs/${it.id}`;
-            // If you have getImageUrl, use it. Otherwise use TMDB raw path or placeholder.
-            const poster =
-              // getImageUrl?.(it.poster_path, 'w342') ??
-              (it.poster_path ? `https://image.tmdb.org/t/p/w342${it.poster_path}` : null);
-
-            return (
-              <li key={`${it.media_type}-${it.id}`} className="group overflow-hidden rounded-xl border border-white/10 bg-white/5">
-                <Link href={href} className="block">
-                  <div className="relative aspect-[2/3]">
-                    {poster ? (
-                      <Image
-                        src={poster}
-                        alt={it.title}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 15vw"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-white/60 text-xs">
-                        No Image
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-2">
-                    <div className="line-clamp-2 text-sm text-white">{it.title}</div>
-                    {it.year ? (
-                      <div className="text-xs text-white/60">{it.year}</div>
-                    ) : null}
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* Bottom pagination (duplicates header controls for convenience) */}
-      {q && data.total_pages > 1 ? (
-        <div className="mt-6 flex items-center justify-center gap-3">
-          <Link
-            href={buildHref(q, Math.max(1, page - 1))}
-            className={cn(
-              'px-3 py-1.5 rounded border border-white/15 text-sm',
-              page <= 1 ? 'pointer-events-none opacity-40' : 'hover:bg-white/10'
+            {showSkeleton && (
+              <div className="space-y-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <ResultCardSkeleton key={i} />
+                ))}
+              </div>
             )}
-            aria-disabled={page <= 1}
-          >
-            Prev
-          </Link>
-          <span className="text-sm text-white/70">
-            Page <span className="text-white">{page}</span> of{' '}
-            <span className="text-white">{data.total_pages}</span>
-          </span>
-          <Link
-            href={buildHref(q, Math.min(data.total_pages, page + 1))}
-            className={cn(
-              'px-3 py-1.5 rounded border border-white/15 text-sm',
-              page >= data.total_pages
-                ? 'pointer-events-none opacity-40'
-                : 'hover:bg-white/10'
+
+            {qParam && !isLoading && activeType === 'movie' && (
+              <div className="space-y-4">
+                {movies.map((m) => (
+                  <ResultCard
+                    key={`movie-${m.id}`}
+                    href={`/movie/${m.id}`}
+                    imagePath={m.poster_path}
+                    title={m.title || 'Untitled'}
+                    subtitle={formatDateSafe(m.release_date)}
+                    overview={m.overview}
+                  />
+                ))}
+                {moviesCount === 0 && <EmptyState query={qParam} typeLabel="movies" />}
+              </div>
             )}
-            aria-disabled={page >= data.total_pages}
-          >
-            Next
-          </Link>
+
+            {qParam && !isLoading && activeType === 'tv' && (
+              <div className="space-y-4">
+                {tv.map((t) => (
+                  <ResultCard
+                    key={`tv-${t.id}`}
+                    href={`/tvs/${t.id}`}
+                    imagePath={t.poster_path}
+                    title={t.name || 'Untitled'}
+                    subtitle={formatDateSafe(t.first_air_date)}
+                    overview={t.overview}
+                  />
+                ))}
+                {tvCount === 0 && <EmptyState query={qParam} typeLabel="TV shows" />}
+              </div>
+            )}
+
+            {qParam && !isLoading && activeType === 'person' && (
+              <div className="space-y-4">
+                {people.map((p) => (
+                  <ResultCard
+                    key={`person-${p.id}`}
+                    href={`/person/${p.id}`}
+                    imagePath={p.profile_path}
+                    title={p.name || 'Unknown'}
+                    subtitle={p.known_for_department || ''}
+                    overview={undefined}
+                  />
+                ))}
+                {peopleCount === 0 && <EmptyState query={qParam} typeLabel="people" />}
+              </div>
+            )}
+          </main>
         </div>
-      ) : null}
-    </section>
+      </section>
+
+      <Footer />
+    </div>
+  );
+}
+
+function SidebarItem({
+  label,
+  count,
+  active = false,
+  disabled = false,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active?: boolean;
+  disabled?: boolean;
+  onClick?: () => void;
+}) {
+  const base = 'flex items-center justify-between w-full rounded-md px-3 py-2 text-sm';
+  const state = disabled
+    ? 'opacity-50 cursor-not-allowed'
+    : active
+    ? 'bg-white/20 text-white'
+    : 'hover:bg-white/10 text-gray-200';
+  return (
+    <button type="button" className={`${base} ${state}`} disabled={disabled} onClick={onClick}>
+      <span>{label}</span>
+      <span className="inline-flex items-center justify-center min-w-6 h-6 text-xs rounded-full bg-white/20 px-2">
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function ResultCard({
+  href,
+  imagePath,
+  title,
+  subtitle,
+  overview,
+}: {
+  href: string;
+  imagePath?: string | null;
+  title: string;
+  subtitle?: string;
+  overview?: string;
+}) {
+  return (
+    <Link href={href} className="block">
+      <article className="rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition shadow">
+        <div className="flex gap-4 p-3 sm:p-4">
+          <div className="relative w-[85px] h-[125px] shrink-0 overflow-hidden rounded">
+            {imagePath ? (
+              <Image src={getImageUrl(imagePath, 'w185')} alt={title} fill className="object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-gray-400 bg-white/10">
+                No Image
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-lg font-semibold text-white">{title}</h3>
+            {subtitle && <p className="text-sm text-gray-300">{subtitle}</p>}
+            {overview && <p className="mt-2 text-gray-200 line-clamp-2 sm:line-clamp-3">{overview}</p>}
+          </div>
+        </div>
+      </article>
+    </Link>
+  );
+}
+
+function EmptyState({ query, typeLabel }: { query: string; typeLabel: string }) {
+  return (
+    <div className="text-gray-300">
+      No {typeLabel} found for <span className="text-white font-medium">“{query}”</span>.
+    </div>
   );
 }
