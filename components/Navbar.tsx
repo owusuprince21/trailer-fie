@@ -65,15 +65,26 @@ export default function Navbar() {
   const prefetch = useSmartPrefetch();
 
   // Subscribe FIRST, then finalize any pending redirect (prevents iOS race)
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setAuthReady(true);
-      if (u) setSigningIn(false); // ensure buttons re-enable after successful redirect
-    });
-    completeAuthRedirect().catch(() => {});
-    return () => unsub();
-  }, []);
+useEffect(() => {
+  const unsub = onAuthStateChanged(auth, (u) => {
+    setUser(u);
+    setAuthReady(true);
+    if (u) setSigningIn(false);
+  });
+
+  // Immediately resolve any completed redirect and set user right away
+  completeAuthRedirect()
+    .then((u) => {
+      if (u) {
+        setUser(u);
+        setAuthReady(true);
+        setSigningIn(false);
+      }
+    })
+    .catch(() => { /* ignore */ });
+
+  return () => unsub();
+}, []);
 
   useEffect(() => setMounted(true), []);
 
