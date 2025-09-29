@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, ChevronDown, User } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, signInWithGoogle, logout, completeAuthRedirect } from '@/lib/firebase';
+import { auth, signInWithGoogle, logout, completeAuthRedirect,  isRedirectInFlight, clearRedirectInFlight} from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -66,24 +66,50 @@ export default function Navbar() {
 
   // Subscribe FIRST, then finalize any pending redirect (prevents iOS race)
 useEffect(() => {
+  let stop = false;
+
   const unsub = onAuthStateChanged(auth, (u) => {
+    if (stop) return;
     setUser(u);
     setAuthReady(true);
     if (u) setSigningIn(false);
   });
 
-  // Immediately resolve any completed redirect and set user right away
+  // 1) Try to resolve a completed redirect immediately
   completeAuthRedirect()
-    .then((u) => {
+    .then(async (u) => {
+      if (stop) return;
       if (u) {
         setUser(u);
         setAuthReady(true);
         setSigningIn(false);
+        return;
+      }
+
+      // 2) If we *did* start a redirect (mobile) but user isn't here yet,
+      //    gently poll for up to ~2s (Safari/WebView quirk).
+      if (isRedirectInFlight()) {
+        const start = Date.now();
+        const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        while (!stop && Date.now() - start < 2000) {
+          if (auth.currentUser) {
+            setUser(auth.currentUser);
+            setAuthReady(true);
+            setSigningIn(false);
+            clearRedirectInFlight();
+            break;
+          }
+          await wait(100);
+        }
+        // If we time out, just let onAuthStateChanged handle it later.
       }
     })
     .catch(() => { /* ignore */ });
 
-  return () => unsub();
+  return () => {
+    stop = true;
+    unsub();
+  };
 }, []);
 
   useEffect(() => setMounted(true), []);
