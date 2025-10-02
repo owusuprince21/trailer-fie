@@ -76,7 +76,7 @@ export default function Hero() {
                 </span>
                 <Input
                   type="text"
-                  placeholder="Search for movies, TV shows, people..."
+                  placeholder="Search for movies, TV Series, people..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="h-14 md:h-[3.75rem] flex-1 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base md:text-lg placeholder:text-gray-300 text-white px-0"

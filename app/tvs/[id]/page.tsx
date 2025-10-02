@@ -1,11 +1,14 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { Play, Heart, Bookmark, Plus } from 'lucide-react';
+import { Heart, Bookmark, Plus } from 'lucide-react';
+// import dynamic from 'next/dynamic';
 
-import Navbar from '@/components/Navbar';
+import NextDynamic from 'next/dynamic';
+const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 import Footer from '@/components/Footer';
 import Carousel from '@/components/Carousel';
 import MovieCard from '@/components/MovieCard';
@@ -31,13 +34,13 @@ import {
 } from '@/lib/tmdb';
 
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getAuthClient } from '@/lib/firebase'; // 👈 replace `auth` import
 import { addFavorite, getFavorites } from '@/lib/favorites';
 import { addToWatchlist, getWatchlist } from '@/lib/watchlist';
 import { addToLists, getLists } from '@/lib/lists';
 import { logWatchEvent } from '@/lib/watch';
 
-/* --- lightweight skeleton atoms (no deps) --- */
+/* --- tiny skeleton atoms --- */
 function Skel({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-white/10 ${className}`} />;
 }
@@ -47,6 +50,14 @@ function SkelCircle({ className = '' }: { className?: string }) {
 function SkelLine({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse h-4 rounded bg-white/10 ${className}`} />;
 }
+
+
+// Note: WatchProviders is a **server component** in our setup.
+// You can't import a server component directly into a client component,
+// but Next.js allows using dynamic() with { ssr: true } to render it.
+// const WatchProviders = dynamic(() => import('@/app/movie/[id]/WatchProviders'), {
+//   ssr: true,
+// });
 
 export default function TVDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -65,14 +76,14 @@ export default function TVDetailPage() {
   const [isWatch, setIsWatch] = useState(false);
   const [isListed, setIsListed] = useState(false);
 
+  /* Auth subscription */
+useEffect(() => {
+  const auth = getAuthClient();           // ✅ create in browser
+  const unsub = onAuthStateChanged(auth, setUser);
+  return () => unsub();
+}, []);
 
-  // Auth subscription
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, setUser);
-    return () => unsub();
-  }, []);
-
-  // Compute toggles when user/show changes
+  /* Compute toggles when user/show changes */
   useEffect(() => {
     if (!user || !tv) {
       setIsFav(false);
@@ -105,18 +116,28 @@ export default function TVDetailPage() {
       if (!user || !tv) return;
       const { added } = addFavorite(user.uid, {
         id: tv.id,
-        media_type: 'tvs',          // keep 'tvs' to match your routing
-        title: tv.name,             // normalize to title
+        media_type: 'tvs', // keep your app’s internal media_type
+        title: tv.name,
         poster_path: tv.poster_path,
         first_air_date: tv.first_air_date,
         vote_average: tv.vote_average,
       });
       if (added) {
         setIsFav(true);
-        notify({ once: true, title: 'Added to favorites', description: `${tv.name} was added to your favorites.` });
+        notify({
+          once: true,
+          title: 'Added to favorites',
+          description: `${tv.name} was added to your favorites.`,
+          variant: 'success',
+        });
       } else {
         setIsFav(true);
-        notify({ once: true, title: 'Already added', description: `${tv.name} is already in your favorites.` });
+        notify({
+          once: true,
+          title: 'Already added',
+          description: `${tv.name} is already in your favorites.`,
+          variant: 'error',
+        });
       }
     });
 
@@ -133,10 +154,20 @@ export default function TVDetailPage() {
       });
       if (added) {
         setIsWatch(true);
-        notify({ once:true, title: 'Added to watchlist', description: `${tv.name} was added to your watchlist.` });
+        notify({
+          once: true,
+          title: 'Added to watchlist',
+          description: `${tv.name} was added to your watchlist.`,
+          variant: 'success',
+        });
       } else {
         setIsWatch(true);
-        notify({ once: true, title: 'Already added', description: `${tv.name} is already in your watchlist.` });
+        notify({
+          once: true,
+          title: 'Already added',
+          description: `${tv.name} is already in your watchlist.`,
+          variant: 'error',
+        });
       }
     });
 
@@ -153,10 +184,20 @@ export default function TVDetailPage() {
       });
       if (added) {
         setIsListed(true);
-        notify({ once:true, title: 'Added to your list', description: `${tv.name} was added to your list.` });
+        notify({
+          once: true,
+          title: 'Added to your list',
+          description: `${tv.name} was added to your list.`,
+          variant: 'success',
+        });
       } else {
         setIsListed(true);
-        notify({ once:true, title: 'Already added', description: `${tv.name} is already in your list.` });
+        notify({
+          once: true,
+          title: 'Already added',
+          description: `${tv.name} is already in your list.`,
+          variant: 'error',
+        });
       }
     });
 
@@ -165,26 +206,18 @@ export default function TVDetailPage() {
     return (
       <div className="min-h-screen">
         <Navbar />
-
-        {/* Hero skeleton */}
         <section className="relative min-h-[70vh] bg-gradient-to-b from-slate-900 via-slate-900/80 to-slate-900">
           <div className="absolute inset-0 movie-backdrop" />
-
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-white">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-              {/* Poster */}
               <div className="lg:col-span-1">
                 <div className="relative aspect-[2/3] max-w-sm mx-auto lg:mx-0 overflow-hidden rounded-lg shadow-2xl">
                   <Skel className="absolute inset-0" />
                 </div>
               </div>
-
-              {/* Info */}
               <div className="lg:col-span-2 mt-[35px]">
                 <SkelLine className="h-8 w-4/5 mb-3" />
                 <SkelLine className="h-5 w-1/3 mb-8" />
-
-                {/* Score + actions */}
                 <div className="flex items-center gap-6 mb-6">
                   <div className="flex items-center gap-2">
                     <SkelCircle className="w-16 h-16" />
@@ -197,7 +230,6 @@ export default function TVDetailPage() {
                     <Skel className="h-10 w-32 rounded-md" />
                   </div>
                 </div>
-
                 <SkelLine className="h-5 w-1/2 mb-3" />
                 <div className="space-y-3">
                   <SkelLine className="w-full" />
@@ -208,8 +240,6 @@ export default function TVDetailPage() {
             </div>
           </div>
         </section>
-
-        {/* Cast skeleton */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <SkelLine className="h-6 w-48 mb-6" />
           <div className="flex gap-4 overflow-hidden">
@@ -224,21 +254,6 @@ export default function TVDetailPage() {
             ))}
           </div>
         </section>
-
-        {/* Facts skeleton */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-          <SkelLine className="h-6 w-32 mb-6" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="space-y-2">
-                <SkelLine className="h-4 w-36" />
-                <Skel className="h-10 w-full rounded-md" />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Recommendations skeleton */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
           <SkelLine className="h-6 w-56 mb-6" />
           <div className="flex gap-4 overflow-hidden">
@@ -253,7 +268,6 @@ export default function TVDetailPage() {
             ))}
           </div>
         </section>
-
         <Footer />
       </div>
     );
@@ -383,7 +397,9 @@ export default function TVDetailPage() {
                     variant="outline"
                     size="icon"
                     onClick={handleList}
-                    className={`border-white/50 text-white hover:bg-white/30 ${isListed ? 'bg-sky-500/30 hover:bg-sky-500/40' : 'bg-white/20'}`}
+                    className={`border-white/50 text-white hover:bg-white/30 ${
+                      isListed ? 'bg-sky-500/30 hover:bg-sky-500/40' : 'bg-white/20'
+                    }`}
                     aria-label={isListed ? 'Added to your list' : 'Add to your list'}
                     title={isListed ? 'Added to your list' : 'Add to your list'}
                   >
@@ -395,7 +411,9 @@ export default function TVDetailPage() {
                     variant="outline"
                     size="icon"
                     onClick={handleFavorite}
-                    className={`border-white/50 text-white hover:bg-white/30 ${isFav ? 'bg-rose-500/30 hover:bg-rose-500/40' : 'bg-white/20'}`}
+                    className={`border-white/50 text-white hover:bg-white/30 ${
+                      isFav ? 'bg-rose-500/30 hover:bg-rose-500/40' : 'bg-white/20'
+                    }`}
                     aria-label={isFav ? 'Added to favorites' : 'Add to favorites'}
                     title={isFav ? 'Added to favorites' : 'Add to favorites'}
                   >
@@ -407,30 +425,33 @@ export default function TVDetailPage() {
                     variant="outline"
                     size="icon"
                     onClick={handleWatchlist}
-                    className={`border-white/50 text-white hover:bg-white/30 ${isWatch ? 'bg-emerald-500/30 hover:bg-emerald-500/40' : 'bg-white/20'}`}
+                    className={`border-white/50 text-white hover:bg-white/30 ${
+                      isWatch ? 'bg-emerald-500/30 hover:bg-emerald-500/40' : 'bg-white/20'
+                    }`}
                     aria-label={isWatch ? 'Added to watchlist' : 'Add to watchlist'}
                     title={isWatch ? 'Added to watchlist' : 'Add to watchlist'}
                   >
                     <Bookmark className={`h-4 w-4 ${isWatch ? 'text-emerald-200' : ''}`} />
                   </Button>
 
+                  {/* Trailer */}
                   {trailer && (
                     <Dialog>
                       <DialogTrigger asChild>
-<Button
-  onClick={() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    logWatchEvent(uid, {
-      id: tv.id,
-      media_type: 'tvs', // <= your app uses /tvs route
-      name: tv.name,
-      poster_path: tv.poster_path,
-    });
-  }}
->
-  Watch Trailer
-</Button>
+                        <Button
+                          onClick={() => {
+                            const uid = user?.uid; 
+                            if (!uid) return;
+                            logWatchEvent(uid, {
+                              id: tv.id,
+                              media_type: 'tvs', // your app’s internal type
+                              name: tv.name,
+                              poster_path: tv.poster_path,
+                            });
+                          }}
+                        >
+                          Watch Trailer
+                        </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl">
                         <div className="aspect-video">
@@ -455,6 +476,11 @@ export default function TVDetailPage() {
                 <h3 className="text-xl font-semibold mb-2">Overview</h3>
                 <p className="text-gray-200 leading-relaxed">{tv.overview}</p>
               </div>
+
+              {/* WHERE TO WATCH */}
+              {/* <div className="mt-8">
+                <WatchProviders movieId={showId} mediaType="tv" region="GH" />
+              </div> */}
             </div>
           </div>
         </div>

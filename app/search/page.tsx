@@ -1,10 +1,11 @@
 'use client';
-
+export const dynamic = 'force-dynamic'
 import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation'; // ⬅️ removed useSearchParams
-import Navbar from '@/components/Navbar';
+import NextDynamic from 'next/dynamic';
+const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 import Footer from '@/components/Footer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -124,7 +125,7 @@ export default function SearchPage() {
   const router = useRouter();
   const sp = useUrlSearchParams(); // ⬅️ replaced useSearchParams()
   const qParam = (sp.get('q') || '').trim();
-  const typeParam = (sp.get('type') || '').trim().toLowerCase() as 'movie' | 'tv' | 'person' | '';
+  const typeParam = (sp.get('type') || '').trim().toLowerCase() as 'movie' | 'tv' | 'person' | 'collection' | 'company' | 'keyword' | 'network' | 'award' | '';
 
   const [inputValue, setInputValue] = useState(qParam);
   useEffect(() => setInputValue(qParam), [qParam]);
@@ -139,18 +140,34 @@ export default function SearchPage() {
   const movies = all.filter((r) => r.media_type === 'movie');
   const tv = all.filter((r) => r.media_type === 'tv');
   const people = all.filter((r) => r.media_type === 'person');
+  const collections = all.filter((r) => r.media_type === 'collection');
+  const companies = all.filter((r) => r.media_type === 'company');
+  const keywords = all.filter((r) => r.media_type === 'keyword');
+  const networks = all.filter((r) => r.media_type === 'network');
+  const awards = all.filter((r) => r.media_type === 'award');
 
   const moviesCount = movies.length;
   const tvCount = tv.length;
   const peopleCount = people.length;
+  const collectionCount = collections.length;
+  const companiesCount = companies.length;
+  const keywordsCount = keywords.length;
+  const networksCount = networks.length;
+  const awardsCount = awards.length;
 
-  const activeType: 'movie' | 'tv' | 'person' = useMemo(() => {
-    if (typeParam === 'movie' || typeParam === 'tv' || typeParam === 'person') return typeParam;
+  const activeType: 'movie' | 'tv' | 'person' | 'collection' | 'company' | 'keyword' | 'network' | 'award' = useMemo(() => {
+    if (typeParam === 'movie' || typeParam === 'tv' || typeParam === 'person' || typeParam === 'collection' || typeParam === 'company' || typeParam === 'keyword' || typeParam === 'network' || typeParam === 'award') return typeParam;
     if (moviesCount > 0) return 'movie';
     if (tvCount > 0) return 'tv';
     if (peopleCount > 0) return 'person';
+    if (collectionCount > 0) return 'collection';
+    if (companiesCount > 0) return 'company';
+    if (keywordsCount > 0) return 'keyword';
+    if (networksCount > 0) return 'network';
+    if (awardsCount > 0) return 'award';
+    
     return 'movie';
-  }, [typeParam, moviesCount, tvCount, peopleCount]);
+  }, [typeParam, moviesCount, tvCount, peopleCount, collectionCount, companiesCount, keywordsCount, networksCount, awardsCount]);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,7 +176,7 @@ export default function SearchPage() {
     router.push(`/search?q=${encodeURIComponent(next)}&type=${activeType}`);
   };
 
-  const goType = (t: 'movie' | 'tv' | 'person') => {
+  const goType = (t: 'movie' | 'tv' | 'person' | 'collection' | 'company' | 'keyword' | 'network' | 'award') => {
     const nextQ = qParam || inputValue || '';
     router.push(`/search?q=${encodeURIComponent(nextQ)}&type=${t}`);
   };
@@ -178,7 +195,7 @@ export default function SearchPage() {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Search movies, TV, people…"
-              className="pl-9"
+              className="pl-9 text-base md:text-lg"
             />
           </div>
           <Button type="submit">Search</Button>
@@ -198,7 +215,7 @@ export default function SearchPage() {
                 </div>
                 <nav className="p-2">
                   <SidebarItem
-                    label="TV Shows"
+                    label="TV Series"
                     count={tvCount}
                     active={activeType === 'tv'}
                     onClick={() => goType('tv')}
@@ -215,12 +232,37 @@ export default function SearchPage() {
                     active={activeType === 'person'}
                     onClick={() => goType('person')}
                   />
-                  {/* Optional placeholders */}
-                  <SidebarItem label="Collections" count={0} disabled />
-                  <SidebarItem label="Companies" count={0} disabled />
-                  <SidebarItem label="Keywords" count={0} disabled />
-                  <SidebarItem label="Networks" count={0} disabled />
-                  <SidebarItem label="Awards" count={0} disabled />
+                   {/* <SidebarItem
+                    label="Collections"
+                    count={collectionCount}
+                    active={activeType === 'collection'}
+                    onClick={() => goType('collection')}
+                  />
+                  <SidebarItem
+                    label="Companies"
+                    count={companiesCount}
+                    active={activeType === 'company'}
+                    onClick={() => goType('company')}
+                  />
+                  <SidebarItem
+                    label="Keywords"
+                    count={keywordsCount}
+                    active={activeType === 'keyword'}
+                    onClick={() => goType('keyword')}
+                  />
+                  <SidebarItem
+                    label="Networks"
+                    count={0}
+                    active={activeType === 'network'}
+                    onClick={() => goType('network')}
+                  />  
+                  <SidebarItem
+                    label="Awards"
+                    count={awardsCount}
+                    active={activeType === 'award'}
+                    onClick={() => goType('award')}
+                  /> */}
+                  
                 </nav>
               </div>
             )}

@@ -5,13 +5,19 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
+import {
+  getAuthClient,
+  completeAuthRedirect,
+  signInWithGoogle,
+} from '@/lib/firebase';
 import { getWatchEvents, clearWatchEvents, type WatchEvent } from '@/lib/watch';
 import { getFavorites, type FavItem } from '@/lib/favorites';
-import { getWatchlist } from '@/lib/watchlist'; // no type import to avoid mismatch
+import { getWatchlist } from '@/lib/watchlist'; // no type import
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { Clock, Film, Heart, Bookmark, PlayCircle } from 'lucide-react';
+
+// ✅ Replace direct `auth` import with this
+const auth = getAuthClient();
 
 function useAuthGuard() {
   const [ready, setReady] = useState(false);
@@ -34,7 +40,6 @@ function hrefFor(media_type: 'movie' | 'tvs', id: number) {
   return media_type === 'movie' ? `/movie/${id}` : `/tvs/${id}`;
 }
 
-// Safely derive a title from unknown item shapes (favorites/watchlist)
 function displayTitle(item: { media_type: 'movie' | 'tvs' } & Record<string, any>) {
   if (item.media_type === 'movie') return item.title ?? item.name ?? 'Untitled';
   return item.name ?? item.title ?? 'Untitled';
@@ -45,7 +50,7 @@ export default function ActivityPage() {
 
   const [watches, setWatches] = useState<WatchEvent[]>([]);
   const [favorites, setFavorites] = useState<FavItem[]>([]);
-  const [watchlist, setWatchlist] = useState<any[]>([]); // intentionally 'any[]' to avoid strict prop errors
+  const [watchlist, setWatchlist] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -117,7 +122,9 @@ export default function ActivityPage() {
             <Clock className="h-7 w-7 text-white/90" />
           </div>
           <h1 className="text-xl font-bold text-white">See your recent activity</h1>
-          <p className="mt-2 text-white/70">Sign in to view your trailer watches, favorites and watchlist.</p>
+          <p className="mt-2 text-white/70">
+            Sign in to view your trailer watches, favorites and watchlist.
+          </p>
           <div className="mt-5">
             <Button onClick={() => signInWithGoogle()} className="bg-sky-600 hover:bg-sky-700">
               Continue with Google

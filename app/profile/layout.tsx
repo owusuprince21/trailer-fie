@@ -1,6 +1,8 @@
 // app/profile/layout.tsx
+export const dynamic = 'force-dynamic'
 import type { Metadata } from 'next';
-import Navbar from '@/components/Navbar';
+import NextDynamic from 'next/dynamic';
+const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {

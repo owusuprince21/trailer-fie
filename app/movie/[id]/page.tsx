@@ -1,11 +1,14 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Play, Heart, Bookmark, Plus } from 'lucide-react';
+// import dynamic from 'next/dynamic';
 
-import Navbar from '@/components/Navbar';
+import NextDynamic from 'next/dynamic';
+const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 import Footer from '@/components/Footer';
 import Carousel from '@/components/Carousel';
 import MovieCard from '@/components/MovieCard';
@@ -32,7 +35,7 @@ import {
 } from '@/lib/tmdb';
 
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { getAuthClient } from '@/lib/firebase'; // ⬅️ replace `auth` import
 import { addFavorite, getFavorites } from '@/lib/favorites';
 import { addToWatchlist, getWatchlist } from '@/lib/watchlist';
 import { addToLists, getLists } from '@/lib/lists';
@@ -50,8 +53,12 @@ function SkelLine({ className = '' }: { className?: string }) {
 }
 
 export default function MovieDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const movieId = Number(id);
+
+const { id } = useParams<{ id: string }>();
+const movieId = Number(id);
+
+  // Dynamically import WatchProviders to avoid SSR issues with sessionStorage
+  // const WatchProviders = dynamic(() => import('./WatchProviders'), { ssr: true });
 
   // Data hooks
   const { data: movie, isLoading } = useMovieDetails(movieId);
@@ -67,6 +74,7 @@ export default function MovieDetailPage() {
   const [isListed, setIsListed] = useState(false);
   
   useEffect(() => {
+    const auth = getAuthClient();            
     const unsub = onAuthStateChanged(auth, setUser);
     return () => unsub();
   }, []);
@@ -439,7 +447,7 @@ if (!user) {
                       <DialogTrigger asChild>
 <Button
   onClick={() => {
-    const uid = auth.currentUser?.uid;
+    const uid = user?.uid;
     if (!uid) return; // or prompt login
     logWatchEvent(uid, {
       id: movie.id,
@@ -475,6 +483,11 @@ if (!user) {
                 <h3 className="text-xl font-semibold mb-2">Overview</h3>
                 <p className="text-gray-200 leading-relaxed">{movie.overview}</p>
               </div>
+
+              {/* <div className="mt-8">
+                <WatchProviders movieId={movieId} region="GH" />
+              </div> */}
+
             </div>
           </div>
         </div>

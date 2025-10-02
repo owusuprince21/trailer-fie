@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Star } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
+import { getAuthClient, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
+
+// ✅ Initialize auth correctly
+const auth = getAuthClient();
 
 function useAuthGuard() {
   const [ready, setReady] = useState(false);
@@ -24,11 +27,14 @@ function useAuthGuard() {
 export default function RatingsPage() {
   const { ready, user } = useAuthGuard();
   if (!ready) return <div className="p-6 text-white/70">Loading…</div>;
+
   if (!user) {
     return (
       <div className="max-w-3xl mx-auto p-6 text-center">
         <p className="text-white/80 mb-4">Sign in to see your ratings.</p>
-        <Button onClick={() => signInWithGoogle()} className="bg-sky-600 hover:bg-sky-700">Sign in</Button>
+        <Button onClick={() => signInWithGoogle()} className="bg-sky-600 hover:bg-sky-700">
+          Sign in
+        </Button>
       </div>
     );
   }
@@ -39,7 +45,7 @@ export default function RatingsPage() {
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Star className="h-5 w-5 text-yellow-300" /> Ratings
         </h1>
-        <Button asChild variant="outline" className="border-white/20 text-black"> 
+        <Button asChild variant="outline" className="border-white/20 text-black">
           <Link href="/profile">Back to Profile</Link>
         </Button>
       </header>

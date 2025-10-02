@@ -1,8 +1,9 @@
 'use client';
-
+export const dynamic = 'force-dynamic'
 import { useState } from 'react';
 import { Search } from 'lucide-react';
-import Navbar from '@/components/Navbar';
+import NextDynamic from 'next/dynamic';
+const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 import Footer from '@/components/Footer';
 import PersonCard from '@/components/PersonCard';
 import { Input } from '@/components/ui/input';

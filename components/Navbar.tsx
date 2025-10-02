@@ -5,7 +5,24 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, ChevronDown, User } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, signInWithGoogle, logout, completeAuthRedirect,  isRedirectInFlight, clearRedirectInFlight} from '@/lib/firebase';
+
+
+import {
+  getAuthClient,
+  signInWithGoogle,
+  completeAuthRedirect,
+  authReady as waitForAuthReady,
+  markRedirectInFlight,
+  clearRedirectInFlight,
+  googlePopup,
+  logout,
+  isRedirectInFlight,
+  googleRedirect,
+} from '@/lib/firebase';
+
+
+
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -52,6 +69,33 @@ const TV_ITEMS = [
   { label: 'Top Rated',    href: '/tv/top-rated' },
 ];
 
+/** Lightweight env detection for mobile auth edge cases */
+function detectProblematicEnv() {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return { inApp: false, isStandalonePWA: false, isIOS: false, isAndroid: false, ua: '' };
+  }
+
+  const ua = navigator.userAgent || '';
+
+  // Common in-app browsers that frequently break OAuth (cookies/webview)
+  const inApp =
+    /\bFBAN|FBAV|Instagram|Line\/|Twitter|LinkedInApp|Pinterest|Snapchat|WhatsApp|WeChat|TikTok|Messenger/i.test(ua) ||
+    // Android WebView
+    /\bwv\b/.test(ua) ||
+    // iOS WebView indicators
+    (/\b(iPhone|iPad|iPod)\b/i.test(ua) && !/(Safari|CriOS|FxiOS|EdgiOS)/i.test(ua));
+
+  const isIOS = /\b(iPhone|iPad|iPod)\b/i.test(ua);
+  const isAndroid = /Android/i.test(ua);
+
+  // PWA standalone (no browser UI)
+  const isStandalonePWA =
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    (navigator as any).standalone === true;
+
+  return { inApp, isStandalonePWA, isIOS, isAndroid, ua };
+}
+
 export default function Navbar() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
@@ -63,55 +107,57 @@ export default function Navbar() {
   const [signingIn, setSigningIn] = useState(false); // ← added
   const router = useRouter();
   const prefetch = useSmartPrefetch();
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const auth = getAuthClient();
 
   // Subscribe FIRST, then finalize any pending redirect (prevents iOS race)
+// useEffect(() => {
+//   let mounted = true;
+
+//   const unsub = onAuthStateChanged(auth, (u) => {
+//     if (!mounted) return;
+//     console.log('[onAuthStateChanged] user:', u?.email || 'null');
+//     setUser(u);
+//     setSigningIn(false);
+//   });
+
+//   // Only check for redirect on initial load, then mark ready
+//   (async () => {
+//     if (isRedirectInFlight()) {
+//       await completeAuthRedirect();
+//     }
+//     if (mounted) setAuthReady(true);
+//   })();
+
+//   return () => {
+//     mounted = false;
+//     unsub();
+//   };
+// }, []);
+
 useEffect(() => {
-  let stop = false;
+  let mounted = true;
 
   const unsub = onAuthStateChanged(auth, (u) => {
-    if (stop) return;
+    if (!mounted) return;
+    console.log('[onAuthStateChanged] user:', u?.email || 'null');
     setUser(u);
-    setAuthReady(true);
-    if (u) setSigningIn(false);
+    setSigningIn(false);
   });
 
-  // 1) Try to resolve a completed redirect immediately
-  completeAuthRedirect()
-    .then(async (u) => {
-      if (stop) return;
-      if (u) {
-        setUser(u);
-        setAuthReady(true);
-        setSigningIn(false);
-        return;
-      }
-
-      // 2) If we *did* start a redirect (mobile) but user isn't here yet,
-      //    gently poll for up to ~2s (Safari/WebView quirk).
-      if (isRedirectInFlight()) {
-        const start = Date.now();
-        const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-        while (!stop && Date.now() - start < 2000) {
-          if (auth.currentUser) {
-            setUser(auth.currentUser);
-            setAuthReady(true);
-            setSigningIn(false);
-            clearRedirectInFlight();
-            break;
-          }
-          await wait(100);
-        }
-        // If we time out, just let onAuthStateChanged handle it later.
-      }
-    })
-    .catch(() => { /* ignore */ });
+  // Only check for redirect on initial load, then mark ready
+  (async () => {
+    if (isRedirectInFlight()) {
+      await completeAuthRedirect();
+    }
+    if (mounted) setAuthReady(true);
+  })();
 
   return () => {
-    stop = true;
+    mounted = false;
     unsub();
   };
-}, []);
-
+}, []); // ← Empty dependency array - run once on mount
   useEffect(() => setMounted(true), []);
 
   // Lock page scroll when the mobile menu is open
@@ -136,25 +182,75 @@ useEffect(() => {
     if (q) router.push(`/search?q=${encodeURIComponent(q)}`);
   };
 
-  // Desktop popup / Mobile redirect are split to be explicit
-  const handleDesktopSignIn = async () => {
-    try {
-      setSigningIn(true); // ← added
-      await signInWithGoogle({ forceRedirect: false });
-    } catch (err) {
-      console.error('Sign in error:', err);
-      setSigningIn(false); // ← added
+const handleDesktopSignIn = async () => {
+  try {
+    setSigningIn(true);
+    await googlePopup();
+    // success: onAuthStateChanged will set user & clear signingIn
+  } catch (err) {
+    console.error('[signin] popup error', err);
+    setSigningIn(false);
+  }
+};
+
+// const handleMobileSignIn = async () => {
+//   try {
+//     setSigningIn(true);
+//     await googleRedirect(true); // force redirect on mobile
+//     // no manual clear; redirect flow will return and your effect will set state
+//   } catch (err) {
+//     console.error('[signin] redirect error', err);
+//     setSigningIn(false);
+//   }
+// };
+const handleMobileSignIn = async () => {
+  const env = detectProblematicEnv();
+
+  // If inside an in-app browser or PWA standalone, warn the user first.
+  if (env.inApp || env.isStandalonePWA) {
+    alert(
+      'To sign in with Google, please open this site in your browser.\n' +
+        (env.isIOS
+          ? 'Tap the ••• menu and choose "Open in Safari".'
+          : 'Tap the menu and choose "Open in Chrome".')
+    );
+    return;
+  }
+
+  try {
+    setSigningIn(true);
+
+    // Try POPUP first on mobile (more reliable on many devices than redirect)
+    await googlePopup();
+    // onAuthStateChanged will flip UI to avatar
+  } catch (err: any) {
+    console.error('[mobile signin][popup] error:', err);
+    // If popup is blocked or not allowed, fallback to REDIRECT.
+    if (err?.code === 'auth/popup-blocked' || err?.code === 'auth/popup-opener-blocked') {
+      try {
+        markRedirectInFlight();
+        await googleRedirect(true); // will navigate away
+      } catch (e) {
+        console.error('[mobile signin][redirect] error:', e);
+        clearRedirectInFlight();
+        setSigningIn(false);
+        alert('Sign-in was blocked. Please allow pop-ups or try a different browser.');
+      }
+      return;
     }
-  };
-  const handleMobileSignIn = async () => {
-    try {
-      setSigningIn(true); // ← added
-      await signInWithGoogle({ forceRedirect: true });
-    } catch (err) {
-      console.error('Sign in error:', err);
-      setSigningIn(false); // ← added
+
+    if (err?.code === 'auth/popup-closed-by-user') {
+      // user closed it — just stop the spinner
+      setSigningIn(false);
+      return;
     }
-  };
+
+    // Generic error
+    setSigningIn(false);
+    alert('Sign-in failed. Please try again.');
+  }
+};
+
 
   const handleSignOut = async () => {
     try {
@@ -202,7 +298,7 @@ useEffect(() => {
           {/* Desktop Nav */}
           <div className="hidden items-center gap-8 md:flex">
             <HoverDropdown label="Movies" items={MOVIE_ITEMS} />
-            <HoverDropdown label="TV Shows" items={TV_ITEMS} />
+            <HoverDropdown label="TV Series" items={TV_ITEMS} />
             <Link
               href="/people"
               prefetch
@@ -374,7 +470,7 @@ useEffect(() => {
               />
               {/* TV Shows */}
               <MobileAccordion
-                label="TV Shows"
+                label="TV Series"
                 open={openMobileDropdown === 'tv'}
                 onToggle={() =>
                   setOpenMobileDropdown((prev: MobileDropdownKey) => (prev === 'tv' ? null : 'tv'))

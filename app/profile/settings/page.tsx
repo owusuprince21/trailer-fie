@@ -4,9 +4,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Settings, User } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, completeAuthRedirect, signInWithGoogle, logout } from '@/lib/firebase';
+import { getAuthClient, completeAuthRedirect, signInWithGoogle, logout } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+
+// ✅ Initialize Firebase Auth properly
+const auth = getAuthClient();
 
 function useAuthGuard() {
   const [ready, setReady] = useState(false);
@@ -24,12 +27,16 @@ function useAuthGuard() {
 
 export default function SettingsPage() {
   const { ready, user } = useAuthGuard();
+
   if (!ready) return <div className="p-6 text-white/70">Loading…</div>;
+
   if (!user) {
     return (
       <div className="max-w-3xl mx-auto p-6 text-center">
         <p className="text-white/80 mb-4">Sign in to manage settings.</p>
-        <Button onClick={() => signInWithGoogle()} className="bg-sky-600 hover:bg-sky-700">Sign in</Button>
+        <Button onClick={() => signInWithGoogle()} className="bg-sky-600 hover:bg-sky-700">
+          Sign in
+        </Button>
       </div>
     );
   }
@@ -54,16 +61,28 @@ export default function SettingsPage() {
           <div className="grid gap-4">
             <label className="text-sm text-white/80">
               Display name
-              <Input value={displayName} readOnly className="mt-1 bg-white/5 border-white/10 text-white" />
+              <Input
+                value={displayName}
+                readOnly
+                className="mt-1 bg-white/5 border-white/10 text-white"
+              />
             </label>
             <label className="text-sm text-white/80">
               Email
-              <Input value={email} readOnly className="mt-1 bg-white/5 border-white/10 text-white" />
+              <Input
+                value={email}
+                readOnly
+                className="mt-1 bg-white/5 border-white/10 text-white"
+              />
             </label>
           </div>
           <div className="mt-4 flex gap-2">
-            <Button variant="outline" className="border-white/20 text-black">Change password</Button>
-            <Button onClick={() => logout()} className="bg-rose-600 hover:bg-rose-700">Logout</Button>
+            <Button variant="outline" className="border-white/20 text-black">
+              Change password
+            </Button>
+            <Button onClick={() => logout()} className="bg-rose-600 hover:bg-rose-700">
+              Logout
+            </Button>
           </div>
         </section>
 

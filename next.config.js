@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // ❌ Remove or comment this out:
-  // output: 'export',
+
+  //  output: 'export',
 
   eslint: {
     ignoreDuringBuilds: true,
@@ -11,9 +11,23 @@ const nextConfig = {
     domains: ['image.tmdb.org', 'lh3.googleusercontent.com'],
     formats: ['image/avif', 'image/webp'],
   },
-  experimental: {
-    appDir: true
-  }
+  async headers() {
+    return [
+      {
+        // Loosen for all pages, simplest/safest for Firebase auth popups
+        source: '/:path*',
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          // If you previously set COEP to require-corp, relax it here:
+          { key: 'Cross-Origin-Embedder-Policy', value: 'unsafe-none' },
+        ],
+      },
+      // If you prefer to scope it only to auth-related pages/components, you can target those routes instead.
+    ];
+  },
+  // experimental: {
+  //   appDir: true
+  // }
 };
 
 module.exports = nextConfig;

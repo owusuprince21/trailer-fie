@@ -6,11 +6,14 @@ import Image from 'next/image';
 import { Bookmark, Trash2 } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
-import { auth, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
+import { getAuthClient, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
 import { getWatchlist, removeFromWatchlist } from '@/lib/watchlist';
 import { getImageUrl } from '@/lib/tmdb';
 import { Button } from '@/components/ui/button';
 import { notify } from '@/lib/notify';
+
+// ✅ Use auth client instance correctly
+const auth = getAuthClient();
 
 /** Local shape (mirrors favorites/watchlist/lists item shape) */
 type StoreItem = {
@@ -39,7 +42,6 @@ function useAuthGuard() {
 }
 
 export default function WatchlistPage() {
-  // const { toast } = useToast();
   const { ready, user } = useAuthGuard();
   const [items, setItems] = useState<StoreItem[]>([]);
 
@@ -91,7 +93,11 @@ export default function WatchlistPage() {
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Bookmark className="h-5 w-5 text-emerald-400" /> Watchlist
         </h1>
-        <Button asChild variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white">
+        <Button
+          asChild
+          variant="outline"
+          className="border-white/20 bg-white/10 text-white hover:bg-white"
+        >
           <Link href="/profile">Back to Profile</Link>
         </Button>
       </header>
@@ -108,7 +114,10 @@ export default function WatchlistPage() {
             const title = it.title || it.name || 'Untitled';
             const year = (it.release_date || it.first_air_date || '').slice(0, 4);
             return (
-              <li key={`${it.media_type}-${it.id}`} className="group relative rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+              <li
+                key={`${it.media_type}-${it.id}`}
+                className="group relative rounded-xl border border-white/10 bg-white/5 overflow-hidden"
+              >
                 <Link href={href} className="block">
                   <div className="relative aspect-[2/3]">
                     {it.poster_path ? (
@@ -120,12 +129,13 @@ export default function WatchlistPage() {
                         className="object-cover"
                       />
                     ) : (
-                      <div className="flex items-center justify-center h-full text-white/60">No Image</div>
+                      <div className="flex items-center justify-center h-full text-white/60">
+                        No Image
+                      </div>
                     )}
                   </div>
                 </Link>
 
-                {/* Remove button */}
                 <button
                   onClick={() => handleRemove(it.id)}
                   className="absolute top-2 right-2 inline-flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 p-2"
@@ -135,7 +145,10 @@ export default function WatchlistPage() {
                 </button>
 
                 <div className="p-2">
-                  <Link href={href} className="block text-sm font-medium text-white/90 line-clamp-2">
+                  <Link
+                    href={href}
+                    className="block text-sm font-medium text-white/90 line-clamp-2"
+                  >
                     {title}
                   </Link>
                   <div className="text-xs text-white/60">{year || '—'}</div>

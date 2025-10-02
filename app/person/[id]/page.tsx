@@ -1,9 +1,10 @@
 'use client';
-
+export const dynamic = 'force-dynamic'
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import Navbar from '@/components/Navbar';
+import NextDynamic from 'next/dynamic';
+const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 import Footer from '@/components/Footer';
 import Carousel from '@/components/Carousel';
 import { Button } from '@/components/ui/button';

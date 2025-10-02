@@ -6,11 +6,14 @@ import Image from 'next/image';
 import { List as ListIcon, Trash2 } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
-import { auth, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
+import { getAuthClient, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
 import { getLists, removeFromLists } from '@/lib/lists';
 import { getImageUrl } from '@/lib/tmdb';
 import { Button } from '@/components/ui/button';
 import { notify } from '@/lib/notify';
+
+// ✅ Replace direct auth import
+const auth = getAuthClient();
 
 /** Local shape (mirrors favorites/watchlist/lists item shape) */
 type StoreItem = {
@@ -39,7 +42,6 @@ function useAuthGuard() {
 }
 
 export default function ListsPage() {
-  // const { toast } = useToast();
   const { ready, user } = useAuthGuard();
   const [items, setItems] = useState<StoreItem[]>([]);
 
@@ -49,7 +51,7 @@ export default function ListsPage() {
     setItems(data);
   }, [user]);
 
-  // Initial load + listen for cross/same-tab updates
+  // Initial load + listen for updates
   useEffect(() => {
     if (!user) return;
     load();
@@ -82,7 +84,7 @@ export default function ListsPage() {
   const handleRemove = (id: number) => {
     removeFromLists(user.uid, id);
     setItems((prev) => prev.filter((m) => m.id !== id));
-    notify({ once:true, title: 'Removed', description: 'Title removed from your list.' });
+    notify({ once: true, title: 'Removed', description: 'Title removed from your list.' });
   };
 
   return (
@@ -108,7 +110,10 @@ export default function ListsPage() {
             const title = it.title || it.name || 'Untitled';
             const year = (it.release_date || it.first_air_date || '').slice(0, 4);
             return (
-              <li key={`${it.media_type}-${it.id}`} className="group relative rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+              <li
+                key={`${it.media_type}-${it.id}`}
+                className="group relative rounded-xl border border-white/10 bg-white/5 overflow-hidden"
+              >
                 <Link href={href} className="block">
                   <div className="relative aspect-[2/3]">
                     {it.poster_path ? (
@@ -125,7 +130,6 @@ export default function ListsPage() {
                   </div>
                 </Link>
 
-                {/* Remove button */}
                 <button
                   onClick={() => handleRemove(it.id)}
                   className="absolute top-2 right-2 inline-flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 p-2"

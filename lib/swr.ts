@@ -1,4 +1,5 @@
 // lib/swr.ts
+
 import useSWR, { SWRConfiguration } from 'swr';
 import { tmdbApi } from './tmdb';
 
@@ -25,6 +26,42 @@ export type MultiResult =
     }
   | {
       media_type: 'person';
+      id: number;
+      name?: string;
+      profile_path?: string | null;
+      known_for_department?: string;
+    }
+
+| {
+      media_type: 'collection';
+      id: number;
+      name?: string;
+      profile_path?: string | null;
+      known_for_department?: string;
+    }
+  | {
+      media_type: 'company';
+      id: number;
+      name?: string;
+      profile_path?: string | null;
+      known_for_department?: string;
+    }
+  | {
+      media_type: 'keyword';
+      id: number;
+      name?: string;
+      profile_path?: string | null;
+      known_for_department?: string;
+    }
+  | {
+      media_type: 'network';
+      id: number;
+      name?: string;
+      profile_path?: string | null;
+      known_for_department?: string;
+    }
+  | {
+      media_type: 'award';
       id: number;
       name?: string;
       profile_path?: string | null;

@@ -8,10 +8,13 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
+import { getAuthClient, completeAuthRedirect, signInWithGoogle } from '@/lib/firebase';
 import { notify } from '@/lib/notify';
 import { addFavorite, clearFavorites, getFavorites, removeFavorite, type FavItem } from '@/lib/favorites';
 import { getImageUrl } from '@/lib/tmdb';
+
+// ✅ Replace direct auth import
+const auth = getAuthClient();
 
 function useAuthGuard() {
   const [ready, setReady] = useState(false);
@@ -29,17 +32,14 @@ function useAuthGuard() {
 
 export default function FavoritesPage() {
   const { ready, user } = useAuthGuard();
-  // const { toast } = useToast();
 
   const [items, setItems] = useState<FavItem[]>([]);
 
-  // Load once when auth is ready
   useEffect(() => {
     if (!ready || !user) return;
     setItems(getFavorites(user.uid));
   }, [ready, user]);
 
-  // Listen to cross-tab updates and same-tab custom event
   useEffect(() => {
     if (!user) return;
 
@@ -60,15 +60,14 @@ export default function FavoritesPage() {
 
   const count = items.length;
 
-  // UI helpers
   const removeOne = (id: number) => {
     if (!user) return;
     const ok = removeFavorite(user.uid, id);
     if (ok) {
       setItems((prev) => prev.filter((m) => m.id !== id));
-      notify({ once:true, title: 'Removed', description: 'Movie removed from favorites.' });
+      notify({ once: true, title: 'Removed', description: 'Movie removed from favorites.' });
     } else {
-      notify({ once:true, title: 'Not found', description: 'That movie was not in your favorites.', variant: 'error' });
+      notify({ once: true, title: 'Not found', description: 'That movie was not in your favorites.', variant: 'error' });
     }
   };
 
@@ -76,7 +75,7 @@ export default function FavoritesPage() {
     if (!user) return;
     clearFavorites(user.uid);
     setItems([]);
-    notify({ once:true, title: 'Cleared', description: 'All favorites cleared.' });
+    notify({ once: true, title: 'Cleared', description: 'All favorites cleared.' });
   };
 
   if (!ready) {
@@ -136,10 +135,9 @@ export default function FavoritesPage() {
           <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5">
             {items.map((m) => {
               const title = m.media_type === 'movie' ? m.title : (m.name ?? m.title);
-              const href = `/${m.media_type === 'tvs' ? 'tvs' : 'movie'}/${m.id}`.replace('/tvs', '/tvs'); // route fix if your tv route is /tv/[id]
+              const href = `/${m.media_type === 'tvs' ? 'tvs' : 'movie'}/${m.id}`.replace('/tvs', '/tvs');
               return (
                 <li key={`${m.media_type}-${m.id}`} className="group relative">
-                  {/* Poster */}
                   <Link href={href} className="block rounded-lg overflow-hidden bg-white/5">
                     <div className="relative aspect-[2/3]">
                       {m.poster_path ? (
@@ -156,7 +154,6 @@ export default function FavoritesPage() {
                     </div>
                   </Link>
 
-                  {/* Title + remove */}
                   <div className="mt-2 flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <Link href={href} className="block text-sm font-medium text-white line-clamp-2">

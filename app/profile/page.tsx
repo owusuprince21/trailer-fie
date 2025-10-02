@@ -1,7 +1,6 @@
-// app/profile/page.tsx
 'use client';
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -17,9 +16,10 @@ import {
   Eye,
 } from 'lucide-react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { auth, signInWithGoogle, logout, completeAuthRedirect } from '@/lib/firebase';
+import { getAuthClient, signInWithGoogle, logout, completeAuthRedirect } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
 
 import { getFavorites, type FavItem as StoreItem } from '@/lib/favorites';
 import { getWatchlist } from '@/lib/watchlist';
@@ -48,6 +48,8 @@ import 'keen-slider/keen-slider.min.css';
 import { motion } from 'framer-motion';
 import { useKeenSlider } from 'keen-slider/react';
 
+// ✅ Instead of importing `auth`, get it here safely:
+const auth = getAuthClient();
 
 /* ---------------- Auth hook ---------------- */
 function useAuthGuard() {
@@ -188,10 +190,10 @@ export default function ProfilePage() {
     );
   }
 
+  // ✅ everything below is unchanged
   const avatar = user.photoURL || '';
   const name = user.displayName || 'User';
   const email = user.email || '';
-
   return (
     <>
       {/* Header */}
