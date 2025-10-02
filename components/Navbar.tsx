@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Search, ChevronDown, User } from 'lucide-react';
@@ -53,7 +53,7 @@ function useSmartPrefetch() {
   );
 }
 
-type MobileDropdownKey = 'movies' | 'tv' | null;
+type MobileDropdownKey = "movies" | "tv" | "genres" | null;
 
 const MOVIE_ITEMS = [
   { label: 'Popular',      href: '/movies/popular' },
@@ -68,6 +68,8 @@ const TV_ITEMS = [
   { label: 'On TV',        href: '/tv/on-tv' },
   { label: 'Top Rated',    href: '/tv/top-rated' },
 ];
+
+type Genre = { id: number; name: string };
 
 /** Lightweight env detection for mobile auth edge cases */
 function detectProblematicEnv() {
@@ -110,37 +112,45 @@ export default function Navbar() {
   const [authInitialized, setAuthInitialized] = useState(false);
   const auth = getAuthClient();
 
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [genresLoading, setGenresLoading] = useState(false);
+
+  const genreItems = useMemo(
+  () =>
+    (genres ?? []).map((g) => ({
+      label: g.name,
+      href: `/movies/genre/${g.id}?name=${encodeURIComponent(g.name)}`
+    })),
+  [genres]
+);
+
+// Genre 
+useEffect(() => {
+  let stop = false;
+  async function loadGenres() {
+    try {
+      const res = await fetch('/api/tmdb/genre', { credentials: 'same-origin' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (!stop) setGenres(Array.isArray(json.genres) ? json.genres : []);
+    } catch (e) {
+      console.error('[genres] load failed:', e);
+      if (!stop) setGenres([]);
+    }
+  }
+  loadGenres();
+  return () => { stop = true; };
+}, []);
+
+
+
   // Subscribe FIRST, then finalize any pending redirect (prevents iOS race)
-// useEffect(() => {
-//   let mounted = true;
-
-//   const unsub = onAuthStateChanged(auth, (u) => {
-//     if (!mounted) return;
-//     console.log('[onAuthStateChanged] user:', u?.email || 'null');
-//     setUser(u);
-//     setSigningIn(false);
-//   });
-
-//   // Only check for redirect on initial load, then mark ready
-//   (async () => {
-//     if (isRedirectInFlight()) {
-//       await completeAuthRedirect();
-//     }
-//     if (mounted) setAuthReady(true);
-//   })();
-
-//   return () => {
-//     mounted = false;
-//     unsub();
-//   };
-// }, []);
-
 useEffect(() => {
   let mounted = true;
 
   const unsub = onAuthStateChanged(auth, (u) => {
     if (!mounted) return;
-    console.log('[onAuthStateChanged] user:', u?.email || 'null');
+    // console.log('[onAuthStateChanged] user:', u?.email || 'null');
     setUser(u);
     setSigningIn(false);
   });
@@ -299,6 +309,12 @@ const handleMobileSignIn = async () => {
           <div className="hidden items-center gap-8 md:flex">
             <HoverDropdown label="Movies" items={MOVIE_ITEMS} />
             <HoverDropdown label="TV Series" items={TV_ITEMS} />
+             <HoverDropdown
+    label={genresLoading ? 'Movie Category…' : 'Movie Category'}
+    items={genreItems}
+    scrollable
+  />
+
             <Link
               href="/people"
               prefetch
@@ -317,6 +333,7 @@ const handleMobileSignIn = async () => {
             >
               Events
             </Link>
+           
           </div>
 
           {/* Right: Search (desktop) + Auth + Mobile Toggle */}
@@ -481,6 +498,23 @@ const handleMobileSignIn = async () => {
                   setOpenMobileDropdown(null);
                 }}
               />
+              <MobileAccordion
+              label={genresLoading ? 'Movie Category…' : 'Movie Category'}
+              open={openMobileDropdown === 'genres'}
+              onToggle={() =>
+                setOpenMobileDropdown((prev: MobileDropdownKey) =>
+                  prev === 'genres' ? null : 'genres'
+                )
+              } 
+              items={genreItems}
+              scrollable
+              maxHeightClass="max-h-[40vh]"  // adjust if you want shorter/taller
+              onItemClick={() => {
+                setMobileMenuOpen(false);
+                setOpenMobileDropdown(null);
+              }}
+              />
+
 
               {/* Singles */}
               <div className="mt-2 flex flex-col gap-1">
@@ -560,41 +594,66 @@ const handleMobileSignIn = async () => {
   );
 }
 
-/* ---------- Desktop dropdown (hover + keyboard + prefetch warmup) ---------- */
 function HoverDropdown({
   label,
   items,
+  scrollable,
 }: {
   label: string;
   items: { label: string; href: string }[];
+  scrollable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const prefetch = useSmartPrefetch();
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const warmup = () => items.forEach((it) => prefetch(it.href));
 
   const openMenu = () => {
+    if (!open) warmup();
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
     setOpen(true);
-    items.forEach((it) => prefetch(it.href)); // warm up all targets on open
   };
-  const closeMenu = () => setOpen(false);
 
-  // Close on outside click
+  const scheduleClose = (delay = 220) => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => {
+      setOpen(false);
+      closeTimer.current = null;
+    }, delay);
+  };
+
+  // Toggle on click (good for users who prefer click over hover)
+  const onTriggerClick: React.MouseEventHandler<HTMLButtonElement> = (e) => {
+    e.preventDefault();
+    if (open) {
+      scheduleClose(0);
+    } else {
+      openMenu();
+    }
+  };
+
+  // Outside click closes
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
       if (!ref.current) return;
-      if (!ref.current.contains(e.target as Node)) closeMenu();
+      if (!ref.current.contains(e.target as Node)) {
+        if (closeTimer.current) clearTimeout(closeTimer.current);
+        setOpen(false);
+      }
     }
     document.addEventListener('mousedown', onDocMouseDown);
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, []);
 
-  // Close when focus leaves the dropdown area
+  // True blur close (keyboard/tabbing away)
   const handleBlur: React.FocusEventHandler<HTMLDivElement> = (e) => {
     const next = e.relatedTarget as Node | null;
-    if (!ref.current?.contains(next)) closeMenu();
+    if (!ref.current?.contains(next)) scheduleClose(0);
   };
 
-  // Trigger keyboard handling
+  // Keyboard: open with Enter/Space/ArrowDown and keep focus in menu
   const handleTriggerKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (e) => {
     if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
       e.preventDefault();
@@ -606,7 +665,7 @@ function HoverDropdown({
     }
   };
 
-  // Menu keyboard handling
+  // Arrow nav inside menu
   const handleMenuKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (e) => {
     const itemsEls = Array.from(
       ref.current?.querySelectorAll<HTMLAnchorElement>('a[data-menuitem]') ?? []
@@ -622,7 +681,7 @@ function HoverDropdown({
       prev?.focus();
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      closeMenu();
+      scheduleClose(0);
       (ref.current?.querySelector('button[data-trigger]') as HTMLButtonElement | null)?.focus();
     }
   };
@@ -631,8 +690,11 @@ function HoverDropdown({
     <div
       ref={ref}
       className="relative"
+      // Open immediately on hover/focus
       onMouseEnter={openMenu}
-      onMouseLeave={closeMenu}
+      onFocus={openMenu}
+      // Instead of closing immediately, schedule a delayed close
+      onMouseLeave={() => scheduleClose(220)}
       onBlur={handleBlur}
     >
       <button
@@ -640,8 +702,8 @@ function HoverDropdown({
         className="flex items-center gap-1 text-sm font-medium text-gray-100 transition-colors hover:text-sky-300 focus:outline-none focus:text-sky-300"
         aria-haspopup="menu"
         aria-expanded={open}
-        onFocus={openMenu}
         onKeyDown={handleTriggerKeyDown}
+        onClick={onTriggerClick}
       >
         <span>{label}</span>
         <ChevronDown
@@ -651,16 +713,20 @@ function HoverDropdown({
 
       <div
         className={cn(
-          'absolute left-0 top-full z-50 mt-3 w-56 rounded-2xl border border-white/10 bg-neutral-900/90 p-2 backdrop-blur-xl shadow-2xl transition',
+          'absolute left-0 top-full z-50 mt-3 w-56 rounded-2xl border border-white/10 bg-neutral-900/90 p-2',
+          'backdrop-blur-xl shadow-2xl transition',
+          // Only make scrollable when asked (e.g., Movie Category)
+          scrollable && 'max-h-[60vh] overflow-y-auto overscroll-contain pr-1',
           open ? 'visible opacity-100' : 'invisible opacity-0'
         )}
         role="menu"
         aria-label={label}
         onKeyDown={handleMenuKeyDown}
+        // Keep open while inside the menu
+        onMouseEnter={openMenu}
+        onMouseLeave={() => scheduleClose(220)}
       >
-        {/* pointer buffer to prevent flicker moving from trigger to menu */}
         <div className="absolute -top-3 left-0 right-0 h-3" aria-hidden />
-
         <ul className="flex flex-col">
           {items.map((it) => (
             <li key={it.href}>
@@ -671,8 +737,9 @@ function HoverDropdown({
                 onFocus={() => prefetch(it.href)}
                 role="menuitem"
                 data-menuitem
-                tabIndex={open ? 0 : -1}
                 className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm text-gray-100 hover:bg-white/5 focus:bg-white/10 focus:outline-none"
+                // Close immediately once a choice is made
+                onClick={() => scheduleClose(0)}
               >
                 <span>{it.label}</span>
               </Link>
@@ -684,19 +751,26 @@ function HoverDropdown({
   );
 }
 
-/* ---------- Mobile accordion dropdowns ---------- */
+
+
 function MobileAccordion({
   label,
   open,
   onToggle,
   items,
   onItemClick,
+  scrollable = false,
+  maxHeightClass = 'max-h-[60vh]',
 }: {
   label: string;
   open: boolean;
   onToggle: () => void;
   items: { label: string; href: string }[];
-  onItemClick: () => void;
+  onItemClick?: () => void;
+  /** enable internal scrolling only for long lists */
+  scrollable?: boolean;
+  /** tweakable max height, tailwind class */
+  maxHeightClass?: string;
 }) {
   const prefetch = useSmartPrefetch();
 
@@ -715,8 +789,14 @@ function MobileAccordion({
         <span>{label}</span>
         <ChevronDown className={cn('h-4 w-4 transition-transform', open ? 'rotate-180' : '')} />
       </button>
+
       {open && (
-        <ul className="mt-1 flex max-h-[50vh] flex-col gap-1 overflow-y-auto rounded-lg bg-white/5 p-1">
+        <ul
+          className={cn(
+            'mt-1 flex flex-col gap-1 rounded-lg bg-white/5 p-1',
+            scrollable && `${maxHeightClass} overflow-y-auto`
+          )}
+        >
           {items.map((it) => (
             <li key={it.href}>
               <Link
@@ -724,7 +804,7 @@ function MobileAccordion({
                 prefetch
                 onMouseEnter={() => prefetch(it.href)}
                 onFocus={() => prefetch(it.href)}
-                onClick={onItemClick}
+                onClick={() => onItemClick?.()}
                 className="block rounded-md px-3 py-2 text-sm hover:bg-white/10"
               >
                 {it.label}
@@ -736,6 +816,7 @@ function MobileAccordion({
     </div>
   );
 }
+
 
 /* ---------- Animated hamburger ---------- */
 function Hamburger({ open, onToggle }: { open: boolean; onToggle: () => void }) {
