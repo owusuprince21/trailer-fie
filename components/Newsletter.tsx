@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { notify } from '@/lib/notify';
 
 const newsletterSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -15,7 +16,7 @@ type NewsletterForm = z.infer<typeof newsletterSchema>;
 
 export default function Newsletter() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [alreadySubscribed, setAlreadySubscribed] = useState(false);
 
   const {
     register,
@@ -28,26 +29,45 @@ export default function Newsletter() {
 
   const onSubmit = async (data: NewsletterForm) => {
     setIsSubmitting(true);
-    
     try {
       const response = await fetch('/api/newsletter/subscribe', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
 
       if (response.ok) {
-        setIsSuccess(true);
+        notify({
+          title: 'Subscribed!',
+          description: "You've been added to our newsletter.",
+          variant: 'success',
+        });
         reset();
-        setTimeout(() => setIsSuccess(false), 5000);
+        setAlreadySubscribed(true);
       } else {
-        throw new Error('Failed to subscribe');
+        const { error } = await response.json();
+        if (response.status === 409) {
+          notify({
+            title: 'Already Subscribed',
+            description: 'You have already subscribed with this email.',
+            variant: 'success',
+          });
+          setAlreadySubscribed(true);
+        } else {
+          notify({
+            title: 'Subscription failed',
+            description: error || 'Please try again later.',
+            variant: 'error',
+          });
+        }
       }
     } catch (error) {
       console.error('Newsletter subscription error:', error);
-      // You could add a toast notification here
+      notify({
+        title: 'Error',
+        description: 'Something went wrong. Try again later.',
+        variant: 'error',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -63,34 +83,36 @@ export default function Newsletter() {
           Subscribe to our newsletter and never miss a new trailer release
         </p>
 
-        {isSuccess ? (
-          <div className="bg-green-500/20 border border-green-400 rounded-lg p-4 text-green-100">
-            Thank you for subscribing! You&apos;ll receive updates about the latest trailers.
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="max-w-md mx-auto">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <Input
-                  type="email"
-                  placeholder="Enter your email address"
-                  {...register('email')}
-                  className="bg-white/10 border-white/20 text-white placeholder:text-white/70 text-sm"
-                />
-                {errors.email && (
-                  <p className="text-red-300 text-sm mt-1">{errors.email.message}</p>
-                )}
-              </div>
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="bg-white text-blue-600 hover:bg-gray-100"
-              >
-                {isSubmitting ? 'Subscribing...' : 'Subscribe'}
-              </Button>
+        <form onSubmit={handleSubmit(onSubmit)} className="max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="Enter your email address"
+                {...register('email')}
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/70
+                           text-base md:text-sm"
+                disabled={alreadySubscribed}
+              />
+              {errors.email && (
+                <p className="text-red-300 text-sm mt-1">{errors.email.message}</p>
+              )}
             </div>
-          </form>
-        )}
+            <Button
+              type="submit"
+              disabled={isSubmitting || alreadySubscribed}
+              className="bg-white text-blue-600 hover:bg-gray-100"
+            >
+              {alreadySubscribed
+                ? 'Already Subscribed'
+                : isSubmitting
+                ? 'Subscribing…'
+                : 'Subscribe'}
+            </Button>
+          </div>
+        </form>
       </div>
     </section>
   );
