@@ -69,9 +69,7 @@ export default function PersonCard({ person }: PersonCardProps) {
               priority={false}
             />
           ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-gray-500 text-sm">No Image</span>
-            </div>
+            <Image src="/person-placeholder.svg" alt={name} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
           )}
 
           {/* Hover overlay */}

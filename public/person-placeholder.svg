@@ -1,0 +1,14 @@
+<svg width="500" height="750" viewBox="0 0 500 750" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="500" height="750" fill="#111827"/>
+  <rect width="500" height="750" fill="url(#paint0_radial)"/>
+  <circle cx="250" cy="244" r="92" fill="#334155"/>
+  <path d="M105 592C121 493 180 424 250 424C320 424 379 493 395 592C398 611 383 628 364 628H136C117 628 102 611 105 592Z" fill="#334155"/>
+  <circle cx="250" cy="244" r="78" fill="#64748B"/>
+  <path d="M132 584C151 508 196 462 250 462C304 462 349 508 368 584H132Z" fill="#64748B"/>
+  <defs>
+    <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(250 210) rotate(90) scale(440 293)">
+      <stop stop-color="#0EA5E9" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+</svg>

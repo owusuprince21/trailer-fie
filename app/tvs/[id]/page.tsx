@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Bookmark, Heart, Images, MonitorPlay, Play, Plus, Trophy } from 'lucide-react';
 // import dynamic from 'next/dynamic';
@@ -54,7 +55,8 @@ function SkelLine({ className = '' }: { className?: string }) {
 function CompactCastCard({ person }: { person: any }) {
   const [imageError, setImageError] = useState(false);
   const name = person?.name || 'Unknown';
-  const character = person?.character || 'Unknown role';
+  const role = person?.character || person?.job || person?.department || 'Contributor';
+  const badge = person?.credit_kind === 'crew' ? person?.department || 'Crew' : 'Cast';
 
   return (
     <a
@@ -62,40 +64,56 @@ function CompactCastCard({ person }: { person: any }) {
       className="group overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-md transition hover:-translate-y-1 hover:bg-white/10 hover:shadow-xl"
     >
       <div className="relative aspect-[2/3] bg-gray-200">
-        {!imageError && person.profile_path ? (
-          <Image
-            src={getImageUrl(person.profile_path, 'w342')}
-            alt={name}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
-            className="object-cover transition duration-300 group-hover:scale-105"
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center px-2 text-center text-xs text-gray-500">
-            No Image
-          </div>
-        )}
+        <Image
+          src={!imageError && person.profile_path ? getImageUrl(person.profile_path, 'w342') : '/person-placeholder.svg'}
+          alt={name}
+          fill
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
+          className="object-cover transition duration-300 group-hover:scale-105"
+          onError={() => setImageError(true)}
+        />
+        <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+          {badge}
+        </span>
       </div>
       <div className="p-2.5">
         <h3 className="line-clamp-2 min-h-[2.4em] text-xs font-bold leading-tight text-white sm:text-sm">
           {name}
         </h3>
         <p className="mt-1 line-clamp-2 min-h-[2.2em] text-[11px] leading-tight text-white/65">
-          {character}
+          {role}
         </p>
       </div>
     </a>
   );
 }
 
-function CastCarousel({ cast }: { cast: any[] }) {
+function CastCarousel({ cast, crew = [] }: { cast: any[]; crew?: any[] }) {
+  const castPeople = cast.map((person) => ({ ...person, credit_kind: 'cast' }));
+  const crewPeople = crew.map((person) => ({ ...person, credit_kind: 'crew' }));
+  const dedupe = (people: any[]) =>
+    people.filter((person, index, all) => {
+      const key = person.credit_id ?? `${person.credit_kind}-${person.id}-${person.job ?? person.character ?? index}`;
+      return all.findIndex((candidate, candidateIndex) => {
+        const candidateKey =
+          candidate.credit_id ??
+          `${candidate.credit_kind}-${candidate.id}-${candidate.job ?? candidate.character ?? candidateIndex}`;
+        return candidateKey === key;
+      }) === index;
+    });
+  const featured = dedupe([
+    ...castPeople.slice(0, 8),
+    ...crewPeople.slice(0, 4),
+    ...castPeople.slice(8),
+    ...crewPeople.slice(4),
+  ]).slice(0, 12);
+
   return (
     <div className="overflow-hidden">
       <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide lg:gap-4">
-        {cast.slice(0, 20).map((person: any) => (
+        {featured.map((person: any, index) => (
           <div
-            key={person.credit_id ?? person.id}
+            key={person.credit_id ?? `${person.credit_kind}-${person.id}-${index}`}
             className="w-[calc((100%_-_0.75rem)/2)] shrink-0 min-[520px]:w-[calc((100%_-_1.5rem)/3)] lg:w-[calc((100%_-_6rem)/7)]"
           >
             <CompactCastCard person={person} />
@@ -165,7 +183,15 @@ function ContributorLeaderboard({ crew = [] }: { crew?: any[] }) {
                   sizes="48px"
                   className="object-cover"
                 />
-              ) : null}
+              ) : (
+                <Image
+                  src="/person-placeholder.svg"
+                  alt={person.name}
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                />
+              )}
             </div>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-white">{person.name}</div>
@@ -868,9 +894,17 @@ useEffect(() => {
 
       {/* Top Billed Cast */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h2 className="text-2xl font-bold mb-6 text-white">Series Cast</h2>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-2xl font-bold text-white">Series Cast & Crew</h2>
+          <Link
+            href={`/tvs/${showId}/cast`}
+            className="text-sm font-semibold text-sky-300 hover:text-sky-200"
+          >
+            Full Cast & Crew
+          </Link>
+        </div>
         {credits?.cast ? (
-          <CastCarousel cast={credits.cast} />
+          <CastCarousel cast={credits.cast} crew={credits.crew ?? []} />
         ) : (
           <div className="flex gap-3 overflow-hidden lg:gap-4">
             {Array.from({ length: 7 }).map((_, i) => (

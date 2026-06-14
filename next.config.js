@@ -18,6 +18,19 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'img.youtube.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'media.themoviedb.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 's1.ticketm.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 's1.ticketm.net',
+        pathname: '/dam/**',
+      },
     ],
     formats: ['image/avif', 'image/webp'],
   },

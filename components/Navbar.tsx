@@ -325,6 +325,15 @@ const handleMobileSignIn = async () => {
               People
             </Link>
             <Link
+              href="/awards"
+              prefetch
+              onMouseEnter={() => prefetch('/awards')}
+              onFocus={() => prefetch('/awards')}
+              className="text-sm font-medium text-gray-100 transition-colors hover:text-sky-300"
+            >
+              Awards
+            </Link>
+            <Link
               href="/events"
               prefetch
               onMouseEnter={() => prefetch('/events')}
@@ -526,6 +535,15 @@ const handleMobileSignIn = async () => {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   People
+                </Link>
+                <Link
+                  href="/awards"
+                  prefetch
+                  onMouseEnter={() => prefetch('/awards')}
+                  className="rounded-lg px-3 py-2 text-sm hover:bg-white/5"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Awards
                 </Link>
                 <Link
                   href="/events"

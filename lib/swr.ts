@@ -133,6 +133,46 @@ export interface PersonSummary {
   };
 }
 
+export interface AwardSummary {
+  id: string;
+  slug: string;
+  name: string;
+  date?: string;
+  imageUrl?: string;
+  tmdbUrl: string;
+}
+
+export interface AwardDetails extends AwardSummary {
+  description?: string;
+  logoUrl?: string;
+  backdropUrl?: string;
+  ceremonies: Array<{
+    id: string;
+    name: string;
+    year?: string;
+    tmdbUrl: string;
+  }>;
+  categories: Array<{
+    slug: string;
+    name: string;
+    tmdbUrl: string;
+  }>;
+  mostAwardedMovies: AwardHighlight[];
+  mostAwardedPeople: AwardHighlight[];
+  mostNominatedMovies: AwardHighlight[];
+  mostNominatedPeople: AwardHighlight[];
+}
+
+export interface AwardHighlight {
+  id: string;
+  mediaType: 'movie' | 'tv' | 'person';
+  name: string;
+  imageUrl?: string;
+  nominations?: string;
+  wins?: string;
+  href: string;
+}
+
 /* ----------------------------------------
    SWR utils
 ----------------------------------------- */
@@ -272,6 +312,16 @@ export const usePersonExternalIds = (id: number) =>
 
 export const usePersonSummary = (id: number) =>
   useSWR<PersonSummary>(id ? `/api/tmdb/person/${id}/summary` : null, jsonFetcher, SWR_OPTS);
+
+/* ----------------------------------------
+   Awards (TMDB public awards pages)
+----------------------------------------- */
+
+export const useAwards = () =>
+  useSWR<{ results: AwardSummary[] }>('/api/awards', jsonFetcher, SWR_OPTS);
+
+export const useAwardDetails = (slug?: string) =>
+  useSWR<AwardDetails>(slug ? `/api/awards/${slug}` : null, jsonFetcher, SWR_OPTS);
 
 /* ----------------------------------------
    Search (single API route: /api/tmdb/search/multi)

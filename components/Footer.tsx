@@ -95,6 +95,17 @@ export default function Footer() {
                   Events
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/awards"
+                  prefetch
+                  onMouseEnter={() => prefetch('/awards')}
+                  onFocus={() => prefetch('/awards')}
+                  className="hover:text-white transition-colors"
+                >
+                  Awards
+                </Link>
+              </li>
             </ul>
           </div>
 

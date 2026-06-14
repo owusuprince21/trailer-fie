@@ -253,6 +253,7 @@ export default function PersonDetailPage() {
   const params = useParams();
   const id = Number.parseInt(params.id as string, 10);
   const [bioExpanded, setBioExpanded] = useState(false);
+  const [profileImageError, setProfileImageError] = useState(false);
 
   // Cast SWR results to typed shapes so TS knows the properties
   const personRes = usePersonDetails(id);
@@ -383,6 +384,7 @@ export default function PersonDetailPage() {
   const localKnownCreditsCount = (credits?.cast?.length ?? 0) + (credits?.crew?.length ?? 0);
   const knownCreditsCount = summary?.knownCredits ?? localKnownCreditsCount;
   const crewCreditsCount = credits?.crew?.length ?? 0;
+  const alsoKnownAs = Array.from(new Set(person.also_known_as ?? [])).slice(0, 8);
 
   return (
     <div className="min-h-screen">
@@ -394,20 +396,19 @@ export default function PersonDetailPage() {
           <aside className="lg:sticky lg:top-24 lg:col-span-1 lg:self-start">
             {/* Profile */}
             <div className="relative aspect-[2/3] w-full max-w-sm mx-auto overflow-hidden rounded-xl shadow-2xl bg-white/5">
-              {person.profile_path ? (
-                <Image
-                  src={getImageUrl(person.profile_path, 'w500')}
-                  alt={person.name}
-                  fill
-                  loading="eager"
-                  sizes="(max-width: 1024px) 384px, 33vw"
-                  className="object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-sm text-gray-400">
-                  No Image
-                </div>
-              )}
+              <Image
+                src={
+                  !profileImageError && person.profile_path
+                    ? getImageUrl(person.profile_path, 'w500')
+                    : '/person-placeholder.svg'
+                }
+                alt={person.name}
+                fill
+                loading="eager"
+                sizes="(max-width: 1024px) 384px, 33vw"
+                className="object-cover"
+                onError={() => setProfileImageError(true)}
+              />
             </div>
 
             {/* Social icons */}
@@ -521,12 +522,12 @@ export default function PersonDetailPage() {
                   </div>
                 )}
 
-                {Array.isArray(person.also_known_as) && person.also_known_as.length > 0 && (
+                {alsoKnownAs.length > 0 && (
                   <div>
                     <p className="font-medium text-white">Also Known As</p>
                     <ul className="text-gray-300 space-y-1">
-                      {person.also_known_as.slice(0, 8).map((aka) => (
-                        <li key={aka}>{aka}</li>
+                      {alsoKnownAs.map((aka, index) => (
+                        <li key={`${aka}-${index}`}>{aka}</li>
                       ))}
                     </ul>
                   </div>

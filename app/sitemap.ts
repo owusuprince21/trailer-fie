@@ -8,7 +8,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const siteUrl = getSiteUrl().replace(/\/$/, '');
   const now = new Date();
 
-  const staticRoutes = ['/', '/people', '/events', '/search', '/movie', '/tv'];
+  const staticRoutes = ['/', '/people', '/awards', '/events', '/search', '/movie', '/tv'];
 
   const movieRoutes = MOVIE_CATEGORIES.map(
     (category) => `/movies/${category}`
