@@ -311,8 +311,8 @@ export default function EventsPage() {
         ) : (
           <>
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {events.map((event) => (
-                <EventCard key={event.id} event={event} />
+              {events.map((event, index) => (
+                <EventCard key={event.id} event={event} eagerImage={index === 0} />
               ))}
             </div>
 
@@ -337,7 +337,7 @@ export default function EventsPage() {
   );
 }
 
-function EventCard({ event }: { event: MovieEvent }) {
+function EventCard({ event, eagerImage }: { event: MovieEvent; eagerImage?: boolean }) {
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-pink-300/50 hover:bg-white/[0.07]">
       <Link href={`/events/${event.id}`} className="block">
@@ -347,6 +347,8 @@ function EventCard({ event }: { event: MovieEvent }) {
               src={event.imageUrl}
               alt={event.title}
               fill
+              loading={eagerImage ? 'eager' : 'lazy'}
+              fetchPriority={eagerImage ? 'high' : 'auto'}
               sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
               className="object-cover"
             />
