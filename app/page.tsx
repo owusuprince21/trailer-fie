@@ -5,10 +5,12 @@ import Hero from '@/components/Hero';
 import SectionTabs from '@/components/SectionTabs';
 import Newsletter from '@/components/Newsletter';
 import Footer from '@/components/Footer';
+import HomeDataPrefetcher from '@/components/HomeDataPrefetcher';
 
 export default function Home() {
   return (
     <main>
+      <HomeDataPrefetcher />
       <Navbar />
       <Hero />
       

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useQueryClient } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ export default function MovieCard({ movie, mediaType }: MovieCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageError, setImageError] = useState(false);
   const prefetchedRef = useRef(false);
+  const queryClient = useQueryClient();
 
   if (!movie) return null;
 
@@ -38,9 +40,9 @@ export default function MovieCard({ movie, mediaType }: MovieCardProps) {
     if (prefetchedRef.current || !movie?.id) return;
     try {
       if (mediaType === 'movie') {
-        await prefetchMovie(movie.id);
+        await prefetchMovie(queryClient, movie.id);
       } else {
-        await prefetchTV(movie.id);
+        await prefetchTV(queryClient, movie.id);
       }
       prefetchedRef.current = true;
     } catch {

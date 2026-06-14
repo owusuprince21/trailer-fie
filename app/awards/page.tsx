@@ -4,17 +4,20 @@ import Image from 'next/image';
 import Link from 'next/link';
 import NextDynamic from 'next/dynamic';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Award, CalendarDays, Trophy } from 'lucide-react';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAwards } from '@/lib/swr';
+import { prefetchAward } from '@/lib/prefetch';
 
 const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 
 export const dynamic = 'force-dynamic';
 
 export default function AwardsPage() {
+  const queryClient = useQueryClient();
   const { data, isLoading, error } = useAwards();
   const awards = data?.results ?? [];
   const [visibleCount, setVisibleCount] = useState(24);
@@ -68,6 +71,10 @@ export default function AwardsPage() {
                 <Link
                   key={award.slug}
                   href={`/awards/${award.slug}`}
+                  prefetch
+                  onMouseEnter={() => prefetchAward(queryClient, award.slug)}
+                  onFocus={() => prefetchAward(queryClient, award.slug)}
+                  onTouchStart={() => prefetchAward(queryClient, award.slug)}
                   className="group overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-cyan-300/60 hover:bg-white/[0.07]"
                 >
                   <div className="relative aspect-square bg-neutral-900">

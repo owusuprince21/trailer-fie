@@ -1,7 +1,8 @@
 // lib/swr.ts
 
-import useSWR, { SWRConfiguration } from 'swr';
+import { QueryKey, useQuery } from '@tanstack/react-query';
 import { tmdbApi } from './tmdb';
+import type { MovieEvent } from './events';
 
 /* ----------------------------------------
    Shared types (export so pages can import)
@@ -173,17 +174,69 @@ export interface AwardHighlight {
   href: string;
 }
 
+export interface EventsResponse {
+  configured: boolean;
+  source: string;
+  message?: string;
+  events: MovieEvent[];
+  page: {
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+  };
+}
+
+export interface EventDetailsResponse {
+  configured: boolean;
+  source: string;
+  message?: string;
+  event: MovieEvent | null;
+}
+
 /* ----------------------------------------
    SWR utils
 ----------------------------------------- */
 
-const SWR_OPTS: SWRConfiguration = {
-  revalidateOnFocus: false,
-  keepPreviousData: true,
+export const QUERY_STALE_TIME = 1000 * 60 * 30;
+export const QUERY_GC_TIME = 1000 * 60 * 60 * 4;
+
+export const queryKeys = {
+  trending: (mediaType: 'movie' | 'tv', timeWindow: 'day' | 'week') =>
+    ['trending', mediaType, timeWindow] as const,
+  popular: (mediaType: 'movie' | 'tv') => ['popular', mediaType] as const,
+  topRated: (mediaType: 'movie' | 'tv') => ['top-rated', mediaType] as const,
+  nowPlaying: () => ['now-playing'] as const,
+  upcoming: () => ['upcoming'] as const,
+  airingToday: () => ['airing-today'] as const,
+  onTheAir: () => ['on-the-air'] as const,
+  discover: (mediaType: 'movie' | 'tv', normalized: Record<string, string>) =>
+    ['discover', mediaType, JSON.stringify(normalized)] as const,
+  movie: (id: number) => ['movie', id] as const,
+  tv: (id: number) => ['tv', id] as const,
+  movieCredits: (id: number) => ['movie-credits', id] as const,
+  tvCredits: (id: number) => ['tv-credits', id] as const,
+  movieVideos: (id: number) => ['movie-videos', id] as const,
+  tvVideos: (id: number) => ['tv-videos', id] as const,
+  movieImages: (id: number) => ['movie-images', id] as const,
+  tvImages: (id: number) => ['tv-images', id] as const,
+  movieRecommendations: (id: number) => ['movie-recommendations', id] as const,
+  tvRecommendations: (id: number) => ['tv-recommendations', id] as const,
+  popularPeople: () => ['popular-people'] as const,
+  personDetails: (id: number) => ['api', `/api/tmdb/person/${id}`] as const,
+  personCombinedCredits: (id: number) => ['api', `/api/tmdb/person/${id}/combined_credits`] as const,
+  personExternalIds: (id: number) => ['api', `/api/tmdb/person/${id}/external_ids`] as const,
+  personSummary: (id: number) => ['api', `/api/tmdb/person/${id}/summary`] as const,
+  awards: () => ['api', '/api/awards'] as const,
+  awardDetails: (slug: string) => ['api', `/api/awards/${slug}`] as const,
+  searchMulti: (query: string) => ['api', `/api/tmdb/search/multi${buildQuery({ query })}`] as const,
+  events: (params: Record<string, string | number | boolean | undefined> = {}) =>
+    ['api', `/api/events${buildQuery(params)}`] as const,
+  eventDetails: (id: string) => ['api', `/api/events/${id}`] as const,
 };
 
-async function jsonFetcher<T = any>(url: string): Promise<T> {
-  const res = await fetch(url);
+export async function jsonFetcher<T = any>(url: string): Promise<T> {
+  const res = await fetch(url, { credentials: 'same-origin' });
   if (!res.ok) {
     let detail = '';
     try {
@@ -195,11 +248,7 @@ async function jsonFetcher<T = any>(url: string): Promise<T> {
   return res.json();
 }
 
-function buildKey(base: string, parts?: unknown[]) {
-  return parts ? [base, ...parts] : [base];
-}
-
-function buildQuery(params: Record<string, string | number | boolean | undefined> = {}) {
+export function buildQuery(params: Record<string, string | number | boolean | undefined> = {}) {
   const sp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v === undefined || v === null) return;
@@ -209,33 +258,48 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
   return s ? `?${s}` : '';
 }
 
+function useCachedQuery<T>(
+  queryKey: QueryKey | null,
+  queryFn: () => Promise<T>,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: queryKey ?? ['disabled-query'],
+    queryFn,
+    enabled: Boolean(queryKey) && enabled,
+    staleTime: QUERY_STALE_TIME,
+    gcTime: QUERY_GC_TIME,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+}
+
 /* ----------------------------------------
    Home feeds & discovery (tmdbApi direct)
 ----------------------------------------- */
 
 export const useTrending = (mediaType: 'movie' | 'tv', timeWindow: 'day' | 'week') =>
-  useSWR(buildKey('trending', [mediaType, timeWindow]), () =>
-    tmdbApi.getTrending(mediaType, timeWindow),
-    SWR_OPTS
+  useCachedQuery(queryKeys.trending(mediaType, timeWindow), () =>
+    tmdbApi.getTrending(mediaType, timeWindow)
   );
 
 export const usePopular = (mediaType: 'movie' | 'tv') =>
-  useSWR(buildKey('popular', [mediaType]), () => tmdbApi.getPopular(mediaType), SWR_OPTS);
+  useCachedQuery(queryKeys.popular(mediaType), () => tmdbApi.getPopular(mediaType));
 
 export const useTopRated = (mediaType: 'movie' | 'tv') =>
-  useSWR(buildKey('top-rated', [mediaType]), () => tmdbApi.getTopRated(mediaType), SWR_OPTS);
+  useCachedQuery(queryKeys.topRated(mediaType), () => tmdbApi.getTopRated(mediaType));
 
 export const useNowPlaying = () =>
-  useSWR(buildKey('now-playing'), () => tmdbApi.getNowPlaying(), SWR_OPTS);
+  useCachedQuery(queryKeys.nowPlaying(), () => tmdbApi.getNowPlaying());
 
 export const useUpcoming = () =>
-  useSWR(buildKey('upcoming'), () => tmdbApi.getUpcoming(), SWR_OPTS);
+  useCachedQuery(queryKeys.upcoming(), () => tmdbApi.getUpcoming());
 
 export const useAiringToday = () =>
-  useSWR(buildKey('airing-today'), () => tmdbApi.getAiringToday(), SWR_OPTS);
+  useCachedQuery(queryKeys.airingToday(), () => tmdbApi.getAiringToday());
 
 export const useOnTheAir = () =>
-  useSWR(buildKey('on-the-air'), () => tmdbApi.getOnTheAir(), SWR_OPTS);
+  useCachedQuery(queryKeys.onTheAir(), () => tmdbApi.getOnTheAir());
 
 export const useDiscover = (
   mediaType: 'movie' | 'tv',
@@ -244,8 +308,9 @@ export const useDiscover = (
   const normalized: Record<string, string> = Object.fromEntries(
     Object.entries(params).map(([k, v]) => [k, String(v)])
   );
-  const key = buildKey('discover', [mediaType, JSON.stringify(normalized)]);
-  return useSWR(key, () => tmdbApi.discover(mediaType, normalized), SWR_OPTS);
+  return useCachedQuery(queryKeys.discover(mediaType, normalized), () =>
+    tmdbApi.discover(mediaType, normalized)
+  );
 };
 
 /* ----------------------------------------
@@ -253,41 +318,37 @@ export const useDiscover = (
 ----------------------------------------- */
 
 export const useMovieDetails = (id: number) =>
-  useSWR(id ? buildKey('movie', [id]) : null, () => tmdbApi.getMovieDetails(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.movie(id) : null, () => tmdbApi.getMovieDetails(id));
 
 export const useTVDetails = (id: number) =>
-  useSWR(id ? buildKey('tv', [id]) : null, () => tmdbApi.getTVDetails(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.tv(id) : null, () => tmdbApi.getTVDetails(id));
 
 export const useMovieCredits = (id: number) =>
-  useSWR(id ? buildKey('movie-credits', [id]) : null, () => tmdbApi.getMovieCredits(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.movieCredits(id) : null, () => tmdbApi.getMovieCredits(id));
 
 export const useTVCredits = (id: number) =>
-  useSWR(id ? buildKey('tv-credits', [id]) : null, () => tmdbApi.getTVCredits(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.tvCredits(id) : null, () => tmdbApi.getTVCredits(id));
 
 export const useMovieVideos = (id: number) =>
-  useSWR(id ? buildKey('movie-videos', [id]) : null, () => tmdbApi.getMovieVideos(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.movieVideos(id) : null, () => tmdbApi.getMovieVideos(id));
 
 export const useMovieImages = (id: number) =>
-  useSWR(id ? buildKey('movie-images', [id]) : null, () => tmdbApi.getMovieImages(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.movieImages(id) : null, () => tmdbApi.getMovieImages(id));
 
 export const useTVImages = (id: number) =>
-  useSWR(id ? buildKey('tv-images', [id]) : null, () => tmdbApi.getTVImages(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.tvImages(id) : null, () => tmdbApi.getTVImages(id));
 
 export const useTVVideos = (id: number) =>
-  useSWR(id ? buildKey('tv-videos', [id]) : null, () => tmdbApi.getTVVideos(id), SWR_OPTS);
+  useCachedQuery(id ? queryKeys.tvVideos(id) : null, () => tmdbApi.getTVVideos(id));
 
 export const useMovieRecommendations = (id: number) =>
-  useSWR(
-    id ? buildKey('movie-recommendations', [id]) : null,
-    () => tmdbApi.getMovieRecommendations(id),
-    SWR_OPTS
+  useCachedQuery(id ? queryKeys.movieRecommendations(id) : null, () =>
+    tmdbApi.getMovieRecommendations(id)
   );
 
 export const useTVRecommendations = (id: number) =>
-  useSWR(
-    id ? buildKey('tv-recommendations', [id]) : null,
-    () => tmdbApi.getTVRecommendations(id),
-    SWR_OPTS
+  useCachedQuery(id ? queryKeys.tvRecommendations(id) : null, () =>
+    tmdbApi.getTVRecommendations(id)
   );
 
 /* ----------------------------------------
@@ -295,33 +356,59 @@ export const useTVRecommendations = (id: number) =>
 ----------------------------------------- */
 
 export const usePopularPeople = () =>
-  useSWR(buildKey('popular-people'), () => tmdbApi.getPopularPeople(), SWR_OPTS);
+  useCachedQuery(queryKeys.popularPeople(), () => tmdbApi.getPopularPeople());
 
 export const usePersonDetails = (id: number) =>
-  useSWR<PersonDetails>(id ? `/api/tmdb/person/${id}` : null, jsonFetcher, SWR_OPTS);
+  useCachedQuery<PersonDetails>(
+    id ? queryKeys.personDetails(id) : null,
+    () => jsonFetcher(`/api/tmdb/person/${id}`)
+  );
 
 export const usePersonCombinedCredits = (id: number) =>
-  useSWR<CombinedCredits>(
-    id ? `/api/tmdb/person/${id}/combined_credits` : null,
-    jsonFetcher,
-    SWR_OPTS
+  useCachedQuery<CombinedCredits>(
+    id ? queryKeys.personCombinedCredits(id) : null,
+    () => jsonFetcher(`/api/tmdb/person/${id}/combined_credits`)
   );
 
 export const usePersonExternalIds = (id: number) =>
-  useSWR<ExternalIds>(id ? `/api/tmdb/person/${id}/external_ids` : null, jsonFetcher, SWR_OPTS);
+  useCachedQuery<ExternalIds>(
+    id ? queryKeys.personExternalIds(id) : null,
+    () => jsonFetcher(`/api/tmdb/person/${id}/external_ids`)
+  );
 
 export const usePersonSummary = (id: number) =>
-  useSWR<PersonSummary>(id ? `/api/tmdb/person/${id}/summary` : null, jsonFetcher, SWR_OPTS);
+  useCachedQuery<PersonSummary>(
+    id ? queryKeys.personSummary(id) : null,
+    () => jsonFetcher(`/api/tmdb/person/${id}/summary`)
+  );
 
 /* ----------------------------------------
    Awards (TMDB public awards pages)
 ----------------------------------------- */
 
 export const useAwards = () =>
-  useSWR<{ results: AwardSummary[] }>('/api/awards', jsonFetcher, SWR_OPTS);
+  useCachedQuery<{ results: AwardSummary[] }>(queryKeys.awards(), () => jsonFetcher('/api/awards'));
 
 export const useAwardDetails = (slug?: string) =>
-  useSWR<AwardDetails>(slug ? `/api/awards/${slug}` : null, jsonFetcher, SWR_OPTS);
+  useCachedQuery<AwardDetails>(
+    slug ? queryKeys.awardDetails(slug) : null,
+    () => jsonFetcher(`/api/awards/${slug}`)
+  );
+
+/* ----------------------------------------
+   Events (Ticketmaster API routes)
+----------------------------------------- */
+
+export const useEvents = (params: Record<string, string | number | boolean | undefined> = {}) =>
+  useCachedQuery<EventsResponse>(queryKeys.events(params), () =>
+    jsonFetcher(`/api/events${buildQuery(params)}`)
+  );
+
+export const useEventDetails = (id?: string) =>
+  useCachedQuery<EventDetailsResponse>(
+    id ? queryKeys.eventDetails(id) : null,
+    () => jsonFetcher(`/api/events/${id}`)
+  );
 
 /* ----------------------------------------
    Search (single API route: /api/tmdb/search/multi)
@@ -329,17 +416,16 @@ export const useAwardDetails = (slug?: string) =>
 
 export const useSearchMulti = (query: string) => {
   const q = query?.trim();
-  return useSWR<SearchMultiResponse>(
-    q ? `/api/tmdb/search/multi${buildQuery({ query: q })}` : null,
-    jsonFetcher,
-    SWR_OPTS
+  return useCachedQuery<SearchMultiResponse>(
+    q ? queryKeys.searchMulti(q) : null,
+    () => jsonFetcher(`/api/tmdb/search/multi${buildQuery({ query: q })}`)
   );
 };
 
 /* Optional shims: keep category hooks by filtering /multi */
 export const useSearchMovies = (query: string) => {
   const q = query?.trim();
-  return useSWR<SearchMultiResponse>(
+  return useCachedQuery<SearchMultiResponse>(
     q ? ['search-movies', q] : null,
     async () => {
       const data = await jsonFetcher<SearchMultiResponse>(
@@ -347,14 +433,13 @@ export const useSearchMovies = (query: string) => {
       );
       const results = (data?.results ?? []).filter((r) => r.media_type === 'movie');
       return { ...data, results, total_results: results.length };
-    },
-    SWR_OPTS
+    }
   );
 };
 
 export const useSearchTV = (query: string) => {
   const q = query?.trim();
-  return useSWR<SearchMultiResponse>(
+  return useCachedQuery<SearchMultiResponse>(
     q ? ['search-tv', q] : null,
     async () => {
       const data = await jsonFetcher<SearchMultiResponse>(
@@ -362,14 +447,13 @@ export const useSearchTV = (query: string) => {
       );
       const results = (data?.results ?? []).filter((r) => r.media_type === 'tv');
       return { ...data, results, total_results: results.length };
-    },
-    SWR_OPTS
+    }
   );
 };
 
 export const useSearchPeople = (query: string) => {
   const q = query?.trim();
-  return useSWR<SearchMultiResponse>(
+  return useCachedQuery<SearchMultiResponse>(
     q ? ['search-people', q] : null,
     async () => {
       const data = await jsonFetcher<SearchMultiResponse>(
@@ -377,7 +461,6 @@ export const useSearchPeople = (query: string) => {
       );
       const results = (data?.results ?? []).filter((r) => r.media_type === 'person');
       return { ...data, results, total_results: results.length };
-    },
-    SWR_OPTS
+    }
   );
 };

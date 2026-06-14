@@ -4,9 +4,11 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { getImageUrl } from '@/lib/tmdb';
+import { prefetchPerson } from '@/lib/prefetch';
 
 interface PersonCardProps {
   person: {
@@ -22,6 +24,7 @@ export default function PersonCard({ person }: PersonCardProps) {
   const [imageError, setImageError] = useState(false);
   const [hovered, setHovered] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const prefetched = useRef(false);
 
   if (!person?.id) return null;
@@ -32,10 +35,11 @@ export default function PersonCard({ person }: PersonCardProps) {
   const knownForTitle =
     person.known_for?.[0]?.title || person.known_for?.[0]?.name || '';
 
-  const handlePrefetch = () => {
+  const handlePrefetch = async () => {
     if (prefetched.current) return;
     // App Router prefetch returns void — no .catch()
     router.prefetch(href);
+    await prefetchPerson(queryClient, person.id);
     prefetched.current = true;
   };
 

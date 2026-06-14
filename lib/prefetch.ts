@@ -1,38 +1,109 @@
-// lib/prefetch.ts
-import { mutate } from 'swr';
+import type { QueryClient } from '@tanstack/react-query';
+import { jsonFetcher, queryKeys, QUERY_GC_TIME, QUERY_STALE_TIME } from '@/lib/swr';
 import { tmdbApi } from '@/lib/tmdb';
 
-// SWR keys must match the ones used in lib/swr.ts
+const PREFETCH_OPTS = {
+  staleTime: QUERY_STALE_TIME,
+  gcTime: QUERY_GC_TIME,
+};
 
-export async function prefetchMovie(id: number) {
+export async function prefetchMovie(queryClient: QueryClient, id: number) {
   await Promise.all([
-    mutate(['movie', id], tmdbApi.getMovieDetails(id), { populateCache: true, revalidate: false }),
-    mutate(['movie-credits', id], tmdbApi.getMovieCredits(id), { populateCache: true, revalidate: false }),
-    mutate(['movie-videos', id], tmdbApi.getMovieVideos(id), { populateCache: true, revalidate: false }),
-    mutate(['movie-recommendations', id], tmdbApi.getMovieRecommendations(id), { populateCache: true, revalidate: false }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.movie(id),
+      queryFn: () => tmdbApi.getMovieDetails(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.movieCredits(id),
+      queryFn: () => tmdbApi.getMovieCredits(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.movieVideos(id),
+      queryFn: () => tmdbApi.getMovieVideos(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.movieImages(id),
+      queryFn: () => tmdbApi.getMovieImages(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.movieRecommendations(id),
+      queryFn: () => tmdbApi.getMovieRecommendations(id),
+      ...PREFETCH_OPTS,
+    }),
   ]);
 }
 
-export async function prefetchTV(id: number) {
+export async function prefetchTV(queryClient: QueryClient, id: number) {
   await Promise.all([
-    mutate(['tv', id], tmdbApi.getTVDetails(id), { populateCache: true, revalidate: false }),
-    mutate(['tv-credits', id], tmdbApi.getTVCredits(id), { populateCache: true, revalidate: false }),
-    mutate(['tv-videos', id], tmdbApi.getTVVideos(id), { populateCache: true, revalidate: false }),
-    mutate(['tv-recommendations', id], tmdbApi.getTVRecommendations(id), { populateCache: true, revalidate: false }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.tv(id),
+      queryFn: () => tmdbApi.getTVDetails(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.tvCredits(id),
+      queryFn: () => tmdbApi.getTVCredits(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.tvVideos(id),
+      queryFn: () => tmdbApi.getTVVideos(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.tvImages(id),
+      queryFn: () => tmdbApi.getTVImages(id),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.tvRecommendations(id),
+      queryFn: () => tmdbApi.getTVRecommendations(id),
+      ...PREFETCH_OPTS,
+    }),
   ]);
 }
 
-export async function prefetchPerson(id: number) {
-  // person endpoints are via your /api routes in lib/swr.ts
+export async function prefetchPerson(queryClient: QueryClient, id: number) {
   await Promise.all([
-    mutate(`/api/tmdb/person/${id}`, fetch(`/api/tmdb/person/${id}`).then(r => r.json()), {
-      populateCache: true, revalidate: false,
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.personDetails(id),
+      queryFn: () => jsonFetcher(`/api/tmdb/person/${id}`),
+      ...PREFETCH_OPTS,
     }),
-    mutate(`/api/tmdb/person/${id}/combined_credits`, fetch(`/api/tmdb/person/${id}/combined_credits`).then(r => r.json()), {
-      populateCache: true, revalidate: false,
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.personCombinedCredits(id),
+      queryFn: () => jsonFetcher(`/api/tmdb/person/${id}/combined_credits`),
+      ...PREFETCH_OPTS,
     }),
-    mutate(`/api/tmdb/person/${id}/external_ids`, fetch(`/api/tmdb/person/${id}/external_ids`).then(r => r.json()), {
-      populateCache: true, revalidate: false,
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.personExternalIds(id),
+      queryFn: () => jsonFetcher(`/api/tmdb/person/${id}/external_ids`),
+      ...PREFETCH_OPTS,
+    }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.personSummary(id),
+      queryFn: () => jsonFetcher(`/api/tmdb/person/${id}/summary`),
+      ...PREFETCH_OPTS,
     }),
   ]);
+}
+
+export async function prefetchAward(queryClient: QueryClient, slug: string) {
+  await queryClient.prefetchQuery({
+    queryKey: queryKeys.awardDetails(slug),
+    queryFn: () => jsonFetcher(`/api/awards/${slug}`),
+    ...PREFETCH_OPTS,
+  });
+}
+
+export async function prefetchEvent(queryClient: QueryClient, id: string) {
+  await queryClient.prefetchQuery({
+    queryKey: queryKeys.eventDetails(id),
+    queryFn: () => jsonFetcher(`/api/events/${id}`),
+    ...PREFETCH_OPTS,
+  });
 }

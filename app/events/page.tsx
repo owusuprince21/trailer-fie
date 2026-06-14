@@ -6,12 +6,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import NextDynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Calendar, Clock, MapPin, Search, Ticket, Film, AlertCircle } from 'lucide-react';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { buildQuery, EventsResponse, jsonFetcher, queryKeys, useEvents } from '@/lib/swr';
+import { prefetchEvent } from '@/lib/prefetch';
 
 const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 
@@ -40,19 +43,6 @@ interface MovieEvent {
     max?: number;
     currency?: string;
   } | null;
-}
-
-interface EventsResponse {
-  configured: boolean;
-  source: string;
-  message?: string;
-  events: MovieEvent[];
-  page: {
-    number: number;
-    size: number;
-    totalElements: number;
-    totalPages: number;
-  };
 }
 
 const COUNTRY_OPTIONS = [
@@ -112,11 +102,11 @@ function formatPrice(event: MovieEvent) {
 }
 
 export default function EventsPage() {
+  const queryClient = useQueryClient();
   const [events, setEvents] = useState<MovieEvent[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalEvents, setTotalEvents] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [configured, setConfigured] = useState(true);
@@ -124,6 +114,17 @@ export default function EventsPage() {
   const [keywordInput, setKeywordInput] = useState('');
   const [countryCode, setCountryCode] = useState('US');
   const [filters, setFilters] = useState({ city: '', keyword: '', countryCode: 'US' });
+  const initialParams = useMemo(
+    () => ({
+      page: 0,
+      size: 24,
+      countryCode: filters.countryCode,
+      city: filters.city.trim() || undefined,
+      keyword: filters.keyword.trim() || undefined,
+    }),
+    [filters]
+  );
+  const eventsQuery = useEvents(initialParams);
 
   const eventCountLabel = useMemo(() => {
     if (!totalEvents) return 'Upcoming film events';
@@ -131,43 +132,22 @@ export default function EventsPage() {
   }, [totalEvents]);
 
   useEffect(() => {
-    let ignore = false;
+    const data = eventsQuery.data;
+    if (!data) return;
 
-    async function loadEvents() {
-      setIsLoading(true);
-      setMessage(null);
+    setConfigured(data.configured);
+    setEvents(data.events ?? []);
+    setPage(data.page?.number ?? 0);
+    setTotalPages(data.page?.totalPages ?? 0);
+    setTotalEvents(data.page?.totalElements ?? 0);
+    setMessage(data.message ?? null);
+  }, [eventsQuery.data]);
 
-      const params = new URLSearchParams({
-        page: '0',
-        size: '24',
-        countryCode: filters.countryCode,
-      });
-      if (filters.city.trim()) params.set('city', filters.city.trim());
-      if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim());
-
-      try {
-        const response = await fetch(`/api/events?${params.toString()}`);
-        const data = (await response.json()) as EventsResponse;
-        if (ignore) return;
-
-        setConfigured(data.configured);
-        setEvents(data.events ?? []);
-        setPage(data.page?.number ?? 0);
-        setTotalPages(data.page?.totalPages ?? 0);
-        setTotalEvents(data.page?.totalElements ?? 0);
-        setMessage(data.message ?? null);
-      } catch {
-        if (!ignore) setMessage('Unable to load movie theatre events right now.');
-      } finally {
-        if (!ignore) setIsLoading(false);
-      }
+  useEffect(() => {
+    if (eventsQuery.error) {
+      setMessage('Unable to load movie theatre events right now.');
     }
-
-    loadEvents();
-    return () => {
-      ignore = true;
-    };
-  }, [filters]);
+  }, [eventsQuery.error]);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -182,17 +162,20 @@ export default function EventsPage() {
     if (isLoadingMore || page + 1 >= totalPages) return;
     setIsLoadingMore(true);
 
-    const params = new URLSearchParams({
-      page: String(page + 1),
-      size: '24',
+    const params = {
+      page: page + 1,
+      size: 24,
       countryCode: filters.countryCode,
-    });
-    if (filters.city.trim()) params.set('city', filters.city.trim());
-    if (filters.keyword.trim()) params.set('keyword', filters.keyword.trim());
+      city: filters.city.trim() || undefined,
+      keyword: filters.keyword.trim() || undefined,
+    };
 
     try {
-      const response = await fetch(`/api/events?${params.toString()}`);
-      const data = (await response.json()) as EventsResponse;
+      const data = await queryClient.fetchQuery<EventsResponse>({
+        queryKey: queryKeys.events(params),
+        queryFn: () => jsonFetcher(`/api/events${buildQuery(params)}`),
+        staleTime: 1000 * 60 * 30,
+      });
       setEvents((current) => [...current, ...(data.events ?? [])]);
       setPage(data.page?.number ?? page + 1);
       setTotalPages(data.page?.totalPages ?? totalPages);
@@ -298,7 +281,7 @@ export default function EventsPage() {
           </div>
         )}
 
-        {isLoading ? (
+        {eventsQuery.isLoading ? (
           <EventsSkeleton />
         ) : events.length === 0 ? (
           <div className="rounded-lg border border-white/10 bg-white/[0.04] p-10 text-center">
@@ -312,7 +295,7 @@ export default function EventsPage() {
           <>
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {events.map((event, index) => (
-                <EventCard key={event.id} event={event} eagerImage={index === 0} />
+                <EventCard key={event.id} event={event} eagerImage={index === 0} onWarmup={() => prefetchEvent(queryClient, event.id)} />
               ))}
             </div>
 
@@ -337,10 +320,25 @@ export default function EventsPage() {
   );
 }
 
-function EventCard({ event, eagerImage }: { event: MovieEvent; eagerImage?: boolean }) {
+function EventCard({
+  event,
+  eagerImage,
+  onWarmup,
+}: {
+  event: MovieEvent;
+  eagerImage?: boolean;
+  onWarmup?: () => void;
+}) {
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-1 hover:border-pink-300/50 hover:bg-white/[0.07]">
-      <Link href={`/events/${event.id}`} className="block">
+      <Link
+        href={`/events/${event.id}`}
+        prefetch
+        className="block"
+        onMouseEnter={onWarmup}
+        onFocus={onWarmup}
+        onTouchStart={onWarmup}
+      >
         <div className="relative aspect-[16/9] bg-neutral-900">
           {event.imageUrl ? (
             <Image
@@ -373,7 +371,14 @@ function EventCard({ event, eagerImage }: { event: MovieEvent; eagerImage?: bool
         </div>
 
         <div>
-          <Link href={`/events/${event.id}`} className="block hover:text-pink-100">
+          <Link
+            href={`/events/${event.id}`}
+            prefetch
+            className="block hover:text-pink-100"
+            onMouseEnter={onWarmup}
+            onFocus={onWarmup}
+            onTouchStart={onWarmup}
+          >
             <h3 className="line-clamp-2 min-h-14 text-xl font-bold leading-7 text-white">{event.title}</h3>
           </Link>
           {event.description && <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{event.description}</p>}
@@ -410,7 +415,15 @@ function EventCard({ event, eagerImage }: { event: MovieEvent; eagerImage?: bool
             )}
           </div>
           <Button asChild variant="outline" className="w-full border-white/10 bg-white/[0.03] text-white hover:bg-white/10 hover:text-white">
-            <Link href={`/events/${event.id}`}>Read Event Details</Link>
+            <Link
+              href={`/events/${event.id}`}
+              prefetch
+              onMouseEnter={onWarmup}
+              onFocus={onWarmup}
+              onTouchStart={onWarmup}
+            >
+              Read Event Details
+            </Link>
           </Button>
         </div>
       </div>

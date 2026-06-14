@@ -6,7 +6,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import NextDynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
   Calendar,
@@ -23,15 +22,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { MovieEvent } from '@/lib/events';
+import { useEventDetails } from '@/lib/swr';
 
 const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
-
-interface EventDetailResponse {
-  configured: boolean;
-  source: string;
-  message?: string;
-  event: MovieEvent | null;
-}
 
 function formatEventDate(event: MovieEvent) {
   const raw = event.startsAt || event.localDate;
@@ -93,38 +86,12 @@ function formatDateTime(value?: string) {
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [event, setEvent] = useState<MovieEvent | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
-  const [configured, setConfigured] = useState(true);
+  const eventQuery = useEventDetails(id);
+  const event = eventQuery.data?.event ?? null;
+  const configured = eventQuery.data?.configured ?? true;
+  const message = eventQuery.data?.message || (eventQuery.error ? 'Unable to load this event right now.' : null);
 
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadEvent() {
-      setIsLoading(true);
-      setMessage(null);
-      try {
-        const response = await fetch(`/api/events/${encodeURIComponent(id)}`);
-        const data = (await response.json()) as EventDetailResponse;
-        if (ignore) return;
-        setConfigured(data.configured);
-        setEvent(data.event);
-        setMessage(data.message ?? null);
-      } catch {
-        if (!ignore) setMessage('Unable to load this event right now.');
-      } finally {
-        if (!ignore) setIsLoading(false);
-      }
-    }
-
-    loadEvent();
-    return () => {
-      ignore = true;
-    };
-  }, [id]);
-
-  if (isLoading) {
+  if (eventQuery.isLoading) {
     return (
       <div className="min-h-screen bg-neutral-950 text-white">
         <Navbar />
