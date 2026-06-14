@@ -49,6 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-title" content="Trailer Fie" />
+    <meta name="google-site-verification" content="F4tRe5ZjmUs9MHsh64tc1cByGmwHxQJTuZgsPGDQYWU" />
   </head>
       <body className={inter.className}>
 <Toaster
