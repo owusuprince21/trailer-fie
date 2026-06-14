@@ -1,7 +1,6 @@
 
 export const dynamic = 'force-dynamic'
-import NextDynamic from 'next/dynamic';
-const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
+import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import SectionTabs from '@/components/SectionTabs';
 import Newsletter from '@/components/Newsletter';

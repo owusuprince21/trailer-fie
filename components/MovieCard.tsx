@@ -50,7 +50,7 @@ export default function MovieCard({ movie, mediaType }: MovieCardProps) {
 
   return (
     <motion.div
-      className="relative bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer group h-full flex flex-col"
+      className="relative bg-white rounded-lg shadow-md overflow-hidden cursor-pointer group h-full flex flex-col"
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
       whileHover={{ y: -4 }}
@@ -86,16 +86,16 @@ export default function MovieCard({ movie, mediaType }: MovieCardProps) {
               className="absolute inset-0 bg-black/60 flex items-center justify-center"
             >
               <Button className="bg-white/20 hover:bg-white/30 text-white border-white/50">
-                <Play className="h-5 w-5 mr-2" />
-                Watch Trailer
+                <Play className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Watch Trailer</span>
               </Button>
             </motion.div>
           )}
 
           {/* User Score */}
-          <div className="absolute bottom-2 left-2">
-            <div className="relative w-9 h-9">
-              <svg className="w-9 h-9 transform -rotate-90" viewBox="0 0 36 36">
+          <div className="absolute bottom-1.5 left-1.5">
+            <div className="relative h-8 w-8">
+              <svg className="h-8 w-8 transform -rotate-90" viewBox="0 0 36 36">
                 <path
                   className="text-gray-300"
                   stroke="currentColor"
@@ -116,7 +116,7 @@ export default function MovieCard({ movie, mediaType }: MovieCardProps) {
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-[10px] font-bold text-white bg-black/50 rounded-full w-7 h-7 flex items-center justify-center">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-[9px] font-bold text-white">
                   {score}%
                 </span>
               </div>
@@ -125,21 +125,21 @@ export default function MovieCard({ movie, mediaType }: MovieCardProps) {
         </div>
 
         {/* Fixed-height text block to keep every card the same height */}
-        <div className="p-3">
+        <div className="p-2.5">
           <h3
-            className="font-semibold text-gray-900 mb-1 text-sm md:text-base leading-snug group-hover:text-blue-600 transition-colors line-clamp-2"
+            className="mb-0.5 text-xs font-semibold leading-snug text-gray-900 transition-colors line-clamp-2 group-hover:text-blue-600 sm:text-sm"
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              minHeight: '2.8em',
+              minHeight: '2.6em',
             }}
           >
             {title}
           </h3>
-          <p className="text-xs md:text-sm text-gray-600">{year}</p>
+          <p className="text-[11px] text-gray-600 sm:text-xs">{year}</p>
         </div>
       </Link>
     </motion.div>

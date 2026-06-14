@@ -159,6 +159,16 @@ export const tmdbApi = {
     return response.json();
   },
 
+  getMovieImages: async (id: number) => {
+    const response = await fetch(`/api/tmdb/movie/${id}/images`);
+    return response.json();
+  },
+
+  getTVImages: async (id: number) => {
+    const response = await fetch(`/api/tmdb/tv/${id}/images`);
+    return response.json();
+  },
+
   getTVVideos: async (id: number) => {
     const response = await fetch(`/api/tmdb/tv/${id}/videos`);
     return response.json();

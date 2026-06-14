@@ -112,12 +112,13 @@ const ChartTooltip = RechartsPrimitive.Tooltip;
 
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  // Keep the Recharts props, but relax the bits we actually use so TS stops shouting.
-  Omit<React.ComponentProps<typeof RechartsPrimitive.Tooltip>, 'payload' | 'formatter' | 'labelFormatter'> &
-    React.ComponentProps<'div'> & {
+  React.ComponentProps<'div'> & {
+      active?: boolean;
       hideLabel?: boolean;
       hideIndicator?: boolean;
       indicator?: 'line' | 'dot' | 'dashed';
+      label?: unknown;
+      color?: string;
       nameKey?: string;
       labelKey?: string;
       /** formatter(value, name, item, index, rawPayload) */
@@ -191,7 +192,7 @@ const ChartTooltipContent = React.forwardRef<
       >
         {!nestLabel ? tooltipLabel : null}
         <div className="grid gap-1.5">
-          {payload.map((item, index) => {
+          {payload.map((item: TooltipItem, index: number) => {
             const key = `${nameKey ?? item.name ?? item.dataKey ?? 'value'}`;
             const itemConfig = getPayloadConfigFromPayload(config, item, key);
             const indicatorColor =
@@ -270,7 +271,9 @@ const ChartLegend = RechartsPrimitive.Legend;
 const ChartLegendContent = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<'div'> &
-    Pick<RechartsPrimitive.LegendProps, 'payload' | 'verticalAlign'> & {
+    {
+      payload?: any[];
+      verticalAlign?: 'top' | 'middle' | 'bottom';
       hideIcon?: boolean;
       nameKey?: string;
     }

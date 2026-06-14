@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { timeWindow: string } }
+  { params }: { params: Promise<{ timeWindow: string }> }
 ) {
-  const { timeWindow } = params;
+  const { timeWindow } = await params;
 
   if (!['day', 'week'].includes(timeWindow)) {
     return NextResponse.json({ error: 'Invalid time window' }, { status: 400 });

@@ -58,7 +58,7 @@ export default function Carousel({ children, className = '' }: CarouselProps) {
           {items.map((child, index) => (
             <div
               key={index}
-              className="flex-none w-[220px] sm:w-[240px] lg:w-[260px]"
+              className="flex-none w-[calc((100%_-_0.75rem)/2)] sm:w-[calc((100%_-_2rem)/3)] md:w-[calc((100%_-_3rem)/4)] lg:w-[calc((100%_-_4rem)/5)] xl:w-[calc((100%_-_5rem)/6)]"
             >
               {child}
             </div>

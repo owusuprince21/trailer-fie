@@ -124,6 +124,15 @@ export interface ExternalIds {
   twitter_id?: string | null;
 }
 
+export interface PersonSummary {
+  knownCredits?: number;
+  contentScore?: number;
+  awards?: {
+    wins?: number;
+    nominations?: number;
+  };
+}
+
 /* ----------------------------------------
    SWR utils
 ----------------------------------------- */
@@ -218,6 +227,12 @@ export const useTVCredits = (id: number) =>
 export const useMovieVideos = (id: number) =>
   useSWR(id ? buildKey('movie-videos', [id]) : null, () => tmdbApi.getMovieVideos(id), SWR_OPTS);
 
+export const useMovieImages = (id: number) =>
+  useSWR(id ? buildKey('movie-images', [id]) : null, () => tmdbApi.getMovieImages(id), SWR_OPTS);
+
+export const useTVImages = (id: number) =>
+  useSWR(id ? buildKey('tv-images', [id]) : null, () => tmdbApi.getTVImages(id), SWR_OPTS);
+
 export const useTVVideos = (id: number) =>
   useSWR(id ? buildKey('tv-videos', [id]) : null, () => tmdbApi.getTVVideos(id), SWR_OPTS);
 
@@ -254,6 +269,9 @@ export const usePersonCombinedCredits = (id: number) =>
 
 export const usePersonExternalIds = (id: number) =>
   useSWR<ExternalIds>(id ? `/api/tmdb/person/${id}/external_ids` : null, jsonFetcher, SWR_OPTS);
+
+export const usePersonSummary = (id: number) =>
+  useSWR<PersonSummary>(id ? `/api/tmdb/person/${id}/summary` : null, jsonFetcher, SWR_OPTS);
 
 /* ----------------------------------------
    Search (single API route: /api/tmdb/search/multi)

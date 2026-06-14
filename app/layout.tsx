@@ -4,19 +4,43 @@ import { Inter } from 'next/font/google';
 import Providers from './providers';
 import { Toast } from '@/components/ui/toast';
 import { Toaster } from 'react-hot-toast'
+import { baseMetadata, getSiteUrl, SITE_DESCRIPTION, SITE_NAME } from '@/lib/seo';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'TRAILER FIE - Watch Movie Trailers & Discuss',
-  description: 'Discover and watch millions of movie trailers. Find your favorite movie stars and join discussions.',
-  keywords: 'movie trailers, movies, TV shows, entertainment, cinema, actors, reviews',
-  openGraph: {
-    title: 'TRAILER FIE - Watch Movie Trailers & Discuss',
-    description: 'Discover and watch millions of movie trailers. Find your favorite movie stars and join discussions.',
-    type: 'website',
-    locale: 'en_US',
+  ...baseMetadata({
+    title: `${SITE_NAME} - Movies, TV Shows, Trailers and Cast`,
+    description: SITE_DESCRIPTION,
+    path: '/',
+    image: '/opengraph-image',
+  }),
+  metadataBase: new URL(getSiteUrl()),
+  applicationName: SITE_NAME,
+  keywords: [
+    'movie trailers',
+    'movies',
+    'TV shows',
+    'entertainment',
+    'cinema',
+    'actors',
+    'cast',
+    'where to watch',
+  ],
+  creator: 'Trailer Fie',
+  publisher: 'Trailer Fie',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
   },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

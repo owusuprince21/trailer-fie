@@ -2,12 +2,9 @@
 
 import { initializeApp, getApps } from 'firebase/app';
 import {
-  initializeAuth,
-  indexedDBLocalPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
   browserPopupRedirectResolver,
   GoogleAuthProvider,
+  getAuth,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
@@ -30,12 +27,7 @@ const app = getApps().length ? getApps()[0] : initializeApp(cfg);
 let _auth: Auth | null = null;
 export function getAuthClient(): Auth {
   if (_auth) return _auth;
-  // only runs in the browser because this module is 'use client'
-  _auth = initializeAuth(app, {
-    persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
-    popupRedirectResolver: browserPopupRedirectResolver,
-  });
-  
+  _auth = getAuth(app);
   return _auth;
 }
 

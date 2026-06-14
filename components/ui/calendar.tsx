@@ -53,7 +53,7 @@ function Calendar({
           'aria-selected:bg-accent aria-selected:text-accent-foreground',
         day_hidden: 'invisible',
         ...classNames,
-      }}
+      } as CalendarProps['classNames']}
       components={{
         Chevron: (props) =>
           props.orientation === 'left' ? (

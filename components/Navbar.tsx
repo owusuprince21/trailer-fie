@@ -167,7 +167,7 @@ useEffect(() => {
     mounted = false;
     unsub();
   };
-}, []); // ← Empty dependency array - run once on mount
+}, [auth]); // run once for the stable auth singleton
   useEffect(() => setMounted(true), []);
 
   // Lock page scroll when the mobile menu is open

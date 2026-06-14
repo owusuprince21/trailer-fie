@@ -3,12 +3,22 @@ const nextConfig = {
 
   //  output: 'export',
 
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   images: { 
     unoptimized: true,
-    domains: ['image.tmdb.org', 'lh3.googleusercontent.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'image.tmdb.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'img.youtube.com',
+      },
+    ],
     formats: ['image/avif', 'image/webp'],
   },
   async headers() {

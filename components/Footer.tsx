@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef } from 'react';
-import { Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
+import { FaInstagram, FaTiktok, FaXTwitter, FaYoutube } from 'react-icons/fa6';
 
 /* Prefetch helper for internal routes */
 function useSmartPrefetch() {
@@ -156,20 +156,11 @@ export default function Footer() {
               <a
                 href="#"
                 className="text-gray-400 hover:text-white transition-colors"
-                aria-label="Facebook"
+                aria-label="X formerly Twitter"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Facebook className="h-6 w-6" />
-              </a>
-              <a
-                href="#"
-                className="text-gray-400 hover:text-white transition-colors"
-                aria-label="Twitter"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Twitter className="h-6 w-6" />
+                <FaXTwitter className="h-6 w-6" aria-hidden="true" />
               </a>
               <a
                 href="#"
@@ -178,7 +169,7 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Instagram className="h-6 w-6" />
+                <FaInstagram className="h-6 w-6" aria-hidden="true" />
               </a>
               <a
                 href="#"
@@ -187,7 +178,16 @@ export default function Footer() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Youtube className="h-6 w-6" />
+                <FaYoutube className="h-6 w-6" aria-hidden="true" />
+              </a>
+              <a
+                href="#"
+                className="text-gray-400 hover:text-white transition-colors"
+                aria-label="TikTok"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <FaTiktok className="h-6 w-6" aria-hidden="true" />
               </a>
             </div>
           </div>

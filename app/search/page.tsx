@@ -1,9 +1,9 @@
 'use client';
 export const dynamic = 'force-dynamic'
-import { useMemo, useState, useEffect } from 'react';
+import { Suspense, useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation'; // ⬅️ removed useSearchParams
+import { useRouter, useSearchParams } from 'next/navigation';
 import NextDynamic from 'next/dynamic';
 const Navbar = NextDynamic(() => import('@/components/Navbar'), { ssr: false });
 import Footer from '@/components/Footer';
@@ -13,59 +13,6 @@ import { getImageUrl } from '@/lib/tmdb';
 import { useSearchMulti } from '@/lib/swr';
 import { Search as SearchIcon } from 'lucide-react';
 import type { MultiResult, SearchMultiResponse } from '@/lib/swr';
-
-/* --------- Suspense-free replacement for useSearchParams --------- */
-function useUrlSearchParams(): URLSearchParams {
-  const [sp, setSp] = useState<URLSearchParams>(() => new URLSearchParams());
-
-useEffect(() => {
-  const read = () => setSp(new URLSearchParams(window.location.search));
-
-  const emit = () => window.dispatchEvent(new Event('locationchange'));
-
-  const origPush = history.pushState;
-  const origReplace = history.replaceState;
-
-  // Patch with proper `this` typing and signatures
-  history.pushState = function pushStatePatched(
-    this: History,
-    data: any,
-    unused: string,
-    url?: string | URL | null
-  ) {
-    const ret = origPush.call(this, data, unused, url);
-    emit();
-    return ret;
-  } as History['pushState'];
-
-  history.replaceState = function replaceStatePatched(
-    this: History,
-    data: any,
-    unused: string,
-    url?: string | URL | null
-  ) {
-    const ret = origReplace.call(this, data, unused, url);
-    emit();
-    return ret;
-  } as History['replaceState'];
-
-  // initial + listeners
-  read();
-  window.addEventListener('popstate', read);
-  window.addEventListener('locationchange', read);
-
-  return () => {
-    window.removeEventListener('popstate', read);
-    window.removeEventListener('locationchange', read);
-    history.pushState = origPush;
-    history.replaceState = origReplace;
-  };
-}, []);
-
-
-  return sp;
-}
-/* ---------------------------------------------------------------- */
 
 /* -------------------- tiny skeleton atoms -------------------- */
 function Skel({ className = '' }: { className?: string }) {
@@ -122,8 +69,43 @@ function formatDateSafe(iso?: string) {
 }
 
 export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchPageFallback />}>
+      <SearchPageContent />
+    </Suspense>
+  );
+}
+
+function SearchPageFallback() {
+  return (
+    <div className="min-h-screen">
+      <Navbar />
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[65px]">
+        <div className="flex items-center gap-3">
+          <SkelLine className="h-10 flex-1" />
+          <SkelLine className="h-10 w-24" />
+        </div>
+      </section>
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <aside className="lg:col-span-1">
+            <SidebarSkeleton />
+          </aside>
+          <main className="space-y-4 lg:col-span-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <ResultCardSkeleton key={i} />
+            ))}
+          </main>
+        </div>
+      </section>
+      <Footer />
+    </div>
+  );
+}
+
+function SearchPageContent() {
   const router = useRouter();
-  const sp = useUrlSearchParams(); // ⬅️ replaced useSearchParams()
+  const sp = useSearchParams();
   const qParam = (sp.get('q') || '').trim();
   const typeParam = (sp.get('type') || '').trim().toLowerCase() as 'movie' | 'tv' | 'person' | 'collection' | 'company' | 'keyword' | 'network' | 'award' | '';
 

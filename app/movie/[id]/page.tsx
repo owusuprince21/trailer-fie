@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useParams } from 'next/navigation';
 import Image from 'next/image';
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Play, Heart, Bookmark, Plus } from 'lucide-react';
+import { Play, Heart, Bookmark, Plus, Images, Trophy } from 'lucide-react';
 // import dynamic from 'next/dynamic';
 
 import NextDynamic from 'next/dynamic';
@@ -14,13 +14,14 @@ import Carousel from '@/components/Carousel';
 import MovieCard from '@/components/MovieCard';
 import PersonCard from '@/components/PersonCard';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import toast from 'react-hot-toast';
 import { notify } from '@/lib/notify';
 
 import {
   useMovieDetails,
   useMovieCredits,
+  useMovieImages,
   useMovieVideos,
   useMovieRecommendations,
 } from '@/lib/swr';
@@ -52,6 +53,263 @@ function SkelLine({ className = '' }: { className?: string }) {
   return <div className={`animate-pulse h-4 rounded bg-white/10 ${className}`} />;
 }
 
+function CompactCastCard({ person }: { person: any }) {
+  const [imageError, setImageError] = useState(false);
+  const name = person?.name || 'Unknown';
+  const character = person?.character || 'Unknown role';
+
+  return (
+    <a
+      href={`/person/${person.id}`}
+      className="group overflow-hidden rounded-lg border border-white/10 bg-white/5 shadow-md transition hover:-translate-y-1 hover:bg-white/10 hover:shadow-xl"
+    >
+      <div className="relative aspect-[2/3] bg-gray-200">
+        {!imageError && person.profile_path ? (
+          <Image
+            src={getImageUrl(person.profile_path, 'w342')}
+            alt={name}
+            fill
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 14vw"
+            className="object-cover transition duration-300 group-hover:scale-105"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center px-2 text-center text-xs text-gray-500">
+            No Image
+          </div>
+        )}
+      </div>
+      <div className="p-2.5">
+        <h3 className="line-clamp-2 min-h-[2.4em] text-xs font-bold leading-tight text-white sm:text-sm">
+          {name}
+        </h3>
+        <p className="mt-1 line-clamp-2 min-h-[2.2em] text-[11px] leading-tight text-white/65">
+          {character}
+        </p>
+      </div>
+    </a>
+  );
+}
+
+function CastCarousel({ cast }: { cast: any[] }) {
+  return (
+    <div className="overflow-hidden">
+      <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-hide lg:gap-4">
+        {cast.slice(0, 20).map((person: any) => (
+          <div
+            key={person.credit_id ?? person.id}
+            className="w-[calc((100%_-_0.75rem)/2)] shrink-0 min-[520px]:w-[calc((100%_-_1.5rem)/3)] lg:w-[calc((100%_-_6rem)/7)]"
+          >
+            <CompactCastCard person={person} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContributorLeaderboard({ crew = [] }: { crew?: any[] }) {
+  const contributors = useMemo(() => {
+    const byId = new Map<number, any>();
+
+    crew.forEach((member) => {
+      if (!member?.id) return;
+      const current = byId.get(member.id) ?? {
+        id: member.id,
+        name: member.name || 'Unknown',
+        profile_path: member.profile_path,
+        popularity: member.popularity ?? 0,
+        jobs: new Set<string>(),
+        departments: new Set<string>(),
+      };
+      if (member.job) current.jobs.add(member.job);
+      if (member.department) current.departments.add(member.department);
+      current.popularity = Math.max(current.popularity, member.popularity ?? 0);
+      byId.set(member.id, current);
+    });
+
+    return Array.from(byId.values())
+      .map((person) => ({
+        ...person,
+        jobs: Array.from(person.jobs) as string[],
+        departments: Array.from(person.departments) as string[],
+        score: person.popularity + person.jobs.size * 8 + person.departments.size * 3,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8);
+  }, [crew]);
+
+  if (!contributors.length) return null;
+
+  return (
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <div className="mb-5 flex items-center gap-2">
+        <Trophy className="h-5 w-5 text-yellow-300" />
+        <h2 className="text-2xl font-bold text-white">Top Contributors</h2>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {contributors.map((person, index) => (
+          <a
+            key={person.id}
+            href={`/person/${person.id}`}
+            className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 transition hover:bg-white/10"
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-500 text-sm font-bold text-white">
+              {index + 1}
+            </div>
+            <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white/10">
+              {person.profile_path ? (
+                <Image
+                  src={getImageUrl(person.profile_path, 'w185')}
+                  alt={person.name}
+                  fill
+                  sizes="48px"
+                  className="object-cover"
+                />
+              ) : null}
+            </div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-white">{person.name}</div>
+              <div className="truncate text-xs text-white/60">
+                {person.jobs.slice(0, 2).join(', ') || person.departments.join(', ') || 'Contributor'}
+              </div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MovieMediaPanel({
+  images,
+  videos,
+}: {
+  images?: { backdrops?: any[]; posters?: any[]; logos?: any[] };
+  videos?: { results?: any[] };
+}) {
+  const [active, setActive] = useState<'backdrops' | 'posters' | 'videos'>('backdrops');
+  const backdrops = images?.backdrops ?? [];
+  const posters = images?.posters ?? [];
+  const playableVideos =
+    videos?.results?.filter((video: any) => video.site === 'YouTube') ?? [];
+
+  const tabs = [
+    { key: 'backdrops' as const, label: 'Backdrops', count: backdrops.length },
+    { key: 'posters' as const, label: 'Posters', count: posters.length },
+    { key: 'videos' as const, label: 'Videos', count: playableVideos.length },
+  ];
+
+  if (!backdrops.length && !posters.length && !playableVideos.length) return null;
+
+  return (
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2">
+          <Images className="h-5 w-5 text-sky-300" />
+          <h2 className="text-2xl font-bold text-white">Media</h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActive(tab.key)}
+              className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                active === tab.key
+                  ? 'bg-white text-black'
+                  : 'bg-white/10 text-white hover:bg-white/20'
+              }`}
+            >
+              {tab.label}
+              <span className="ml-1 text-xs opacity-70">{tab.count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {active === 'backdrops' && (
+        <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide">
+          {backdrops.slice(0, 20).map((item: any) => (
+            <div
+              key={item.file_path}
+              className="relative aspect-video w-[82vw] shrink-0 overflow-hidden rounded-lg bg-white/10 sm:w-[520px]"
+            >
+              <Image
+                src={getBackdropUrl(item.file_path, 'w780')}
+                alt="Movie backdrop"
+                fill
+                sizes="(max-width: 640px) 82vw, 520px"
+                className="object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {active === 'posters' && (
+        <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide">
+          {posters.slice(0, 24).map((item: any) => (
+            <div
+              key={item.file_path}
+              className="relative aspect-[2/3] w-[42vw] shrink-0 overflow-hidden rounded-lg bg-white/10 sm:w-[190px]"
+            >
+              <Image
+                src={getImageUrl(item.file_path, 'w342')}
+                alt="Movie poster"
+                fill
+                sizes="(max-width: 640px) 42vw, 190px"
+                className="object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {active === 'videos' && (
+        <div className="flex gap-4 overflow-x-auto pb-3 scrollbar-hide">
+          {playableVideos.slice(0, 16).map((video: any) => (
+            <Dialog key={video.id}>
+              <DialogTrigger asChild>
+                <button className="group relative aspect-video w-[82vw] shrink-0 overflow-hidden rounded-lg bg-white/10 text-left sm:w-[420px]">
+                  <Image
+                    src={`https://img.youtube.com/vi/${video.key}/hqdefault.jpg`}
+                    alt={video.name}
+                    fill
+                    sizes="(max-width: 640px) 82vw, 420px"
+                    className="object-cover transition group-hover:scale-105"
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/35">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-black">
+                      <Play className="h-5 w-5 fill-current" />
+                    </span>
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3">
+                    <p className="line-clamp-1 text-sm font-semibold text-white">{video.name}</p>
+                  </div>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogTitle className="sr-only">{video.name || 'Movie video'}</DialogTitle>
+                <div className="aspect-video">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${video.key}`}
+                    title={video.name}
+                    className="h-full w-full"
+                    allowFullScreen
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function MovieDetailPage() {
 
 const { id } = useParams<{ id: string }>();
@@ -63,6 +321,7 @@ const movieId = Number(id);
   // Data hooks
   const { data: movie, isLoading } = useMovieDetails(movieId);
   const { data: credits } = useMovieCredits(movieId);
+  const { data: movieImages } = useMovieImages(movieId);
   const { data: videos } = useMovieVideos(movieId);
   const { data: recommendations } = useMovieRecommendations(movieId);
 
@@ -335,6 +594,8 @@ if (!user) {
                     src={getImageUrl(movie.poster_path, 'w500')}
                     alt={movie.title}
                     fill
+                    loading="eager"
+                    sizes="(max-width: 1024px) 384px, 33vw"
                     className="object-cover mt-[25px]"
                     onError={handleImageError}
                   />
@@ -461,6 +722,9 @@ if (!user) {
 </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl">
+                        <DialogTitle className="sr-only">
+                          {trailer.name || `${movie.title} trailer`}
+                        </DialogTitle>
                         <div className="aspect-video">
                           <iframe
                             src={`https://www.youtube.com/embed/${trailer.key}`}
@@ -493,59 +757,58 @@ if (!user) {
         </div>
       </section>
 
-      {/* Cast & Facts */}
+      {/* Top Billed Cast */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-          {/* Cast */}
-          <div className="lg:col-span-3">
-            <h2 className="text-2xl font-bold mb-6 text-white">Top Billed Cast</h2>
-            {credits?.cast ? (
-              <Carousel className="w-full">
-                {credits.cast.slice(0, 10).map((person: any) => (
-                  <PersonCard key={person.id} person={person} />
-                ))}
-              </Carousel>
-            ) : (
-              <div className="flex gap-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="w-[220px] sm:w-[240px] lg:w-[260px] shrink-0">
-                    <div className="relative aspect-[2/3] rounded-lg overflow-hidden mb-3">
-                      <Skel className="absolute inset-0" />
-                    </div>
-                    <SkelLine className="w-3/4 mb-2" />
-                    <SkelLine className="w-1/2 h-3" />
-                  </div>
-                ))}
+        <h2 className="text-2xl font-bold mb-6 text-white">Top Billed Cast</h2>
+        {credits?.cast ? (
+          <CastCarousel cast={credits.cast} />
+        ) : (
+          <div className="flex gap-3 overflow-hidden lg:gap-4">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <div
+                key={i}
+                className="w-[calc((100%_-_0.75rem)/2)] shrink-0 overflow-hidden rounded-lg bg-white/5 min-[520px]:w-[calc((100%_-_1.5rem)/3)] lg:w-[calc((100%_-_6rem)/7)]"
+              >
+                <div className="relative aspect-[2/3]">
+                  <Skel className="absolute inset-0" />
+                </div>
+                <div className="p-2.5">
+                  <SkelLine className="mb-2 w-3/4" />
+                  <SkelLine className="h-3 w-1/2" />
+                </div>
               </div>
-            )}
+            ))}
           </div>
+        )}
+      </section>
 
-          {/* Facts */}
-          <div className="lg:col-span-3">
-            <h2 className="text-2xl font-bold mb-6 text-white">Facts</h2>
+      <MovieMediaPanel images={movieImages} videos={videos} />
+      <ContributorLeaderboard crew={credits?.crew ?? []} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div>
-                <h4 className="font-semibold text-white">Status</h4>
-                <p className="text-gray-300">{movie.status}</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Original Language</h4>
-                <p className="text-gray-300">{movie.original_language?.toUpperCase()}</p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Budget</h4>
-                <p className="text-gray-300">
-                  {movie.budget > 0 ? `$${movie.budget.toLocaleString()}` : '-'}
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-white">Revenue</h4>
-                <p className="text-gray-300">
-                  {movie.revenue > 0 ? `$${movie.revenue.toLocaleString()}` : '-'}
-                </p>
-              </div>
-            </div>
+      {/* Facts */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+        <h2 className="text-2xl font-bold mb-6 text-white">Facts</h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div>
+            <h4 className="font-semibold text-white">Status</h4>
+            <p className="text-gray-300">{movie.status}</p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-white">Original Language</h4>
+            <p className="text-gray-300">{movie.original_language?.toUpperCase()}</p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-white">Budget</h4>
+            <p className="text-gray-300">
+              {movie.budget > 0 ? `$${movie.budget.toLocaleString()}` : '-'}
+            </p>
+          </div>
+          <div>
+            <h4 className="font-semibold text-white">Revenue</h4>
+            <p className="text-gray-300">
+              {movie.revenue > 0 ? `$${movie.revenue.toLocaleString()}` : '-'}
+            </p>
           </div>
         </div>
       </section>
